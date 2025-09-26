@@ -22,16 +22,14 @@ func (l *Logger) Close() error {
 	return nil
 }
 
-func NewLogger(service, version, level, filepath string) (*Logger, error) {
+func InitSlog(service, version, level, filepath string) (*Logger, error) {
 	var (
 		logWriter io.Writer = os.Stdout
 		result              = Logger{}
 	)
 
 	if filepath != "" {
-		const perm = 0600 //nolint:gofumpt
-
-		fd, err := os.OpenFile(filepath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, perm)
+		fd, err := os.OpenFile(filepath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open log-file: %s", err)
 		}
