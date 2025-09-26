@@ -1,9 +1,7 @@
 /.idea/
+/scripts/
 
 *.log
-*.json
-*.prof
-*.env
+*.yml
 
-.DS_Store
-Thumbs.db
+Makefile
