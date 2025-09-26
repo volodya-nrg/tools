@@ -1,14 +1,44 @@
 package logger
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"strings"
 )
 
-func InitLogger(service, version, level string, writer io.Writer) error {
+type Logger struct {
+	fd *os.File
+}
+
+func (l *Logger) Close() error {
+	if l.fd != nil {
+		if err := l.fd.Close(); err != nil {
+			return fmt.Errorf("failed to close log-file: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func NewLogger(service, version, level, filepath string) (*Logger, error) {
+	var (
+		logWriter io.Writer = os.Stdout
+		result              = Logger{}
+	)
+
+	if filepath != "" {
+		const perm = 0600 //nolint:gofumpt
+
+		fd, err := os.OpenFile(filepath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, perm)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open log-file: %s", err)
+		}
+
+		logWriter, result.fd = fd, fd
+	}
+
 	programLevel := new(slog.LevelVar)
 
 	switch strings.ToLower(level) {
@@ -21,11 +51,11 @@ func InitLogger(service, version, level string, writer io.Writer) error {
 	case "debug":
 		programLevel.Set(slog.LevelDebug) // error, warn, info, debug
 	default:
-		return fmt.Errorf("unknown log level: %s", level)
+		return nil, fmt.Errorf("unknown log level: %s", level)
 	}
 
 	jsonHandler := slog.
-		NewJSONHandler(writer, &slog.HandlerOptions{
+		NewJSONHandler(logWriter, &slog.HandlerOptions{
 			Level:     programLevel,
 			AddSource: false,
 		}).
@@ -37,17 +67,5 @@ func InitLogger(service, version, level string, writer io.Writer) error {
 
 	slog.SetDefault(newSlog)
 
-	return nil
-}
-
-type cxtHandler struct {
-	slog.Handler
-}
-
-// Handle извлекаем нужные данные из контекста для отображения в логе
-func (h cxtHandler) Handle(ctx context.Context, r slog.Record) error {
-	if traceID, ok := ctx.Value("trace_id").(string); ok {
-		r.AddAttrs(slog.String("trace_id", traceID))
-	}
-	return h.Handler.Handle(ctx, r) //nolint:wrapcheck
+	return &result, nil
 }
