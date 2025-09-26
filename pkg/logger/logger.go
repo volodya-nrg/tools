@@ -29,7 +29,7 @@ func InitSlog(service, version, level, filepath string) (*Logger, error) {
 	)
 
 	if filepath != "" {
-		fd, err := os.OpenFile(filepath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		fd, err := os.OpenFile(filepath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600) //nolint:gofumpt
 		if err != nil {
 			return nil, fmt.Errorf("failed to open log-file: %s", err)
 		}
