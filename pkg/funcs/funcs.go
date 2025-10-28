@@ -110,3 +110,11 @@ func RandIntByRange(minSrc, maxSrc int) int {
 	defer mu.Unlock()
 	return randSource.Intn(maxSrc-minSrc) + minSrc
 }
+
+func StrToTime(str string) time.Time {
+	t, err := time.Parse(time.DateTime, str)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
+}
