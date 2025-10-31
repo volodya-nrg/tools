@@ -30,6 +30,7 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 	require.NotNil(t, cl)
 
 	t.Run("check users", func(t *testing.T) { //nolint:paralleltest
+		// зайдем под админом
 		require.NoError(t, cl.Login(t.Context(), adminLogin, adminPassword))
 
 		newUserID := funcs.RandStr()
@@ -52,14 +53,16 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.NoError(t, err)
 		require.Equal(t, userExpected, userActual)
 
-		// получим дефолтный диапазон пользователей
+		// получим дефолтный диапазон (20) пользователей
 		users, total, err := cl.GetUsers(t.Context(), -1, -1) // limit=default, offset=0
 		require.NoError(t, err)
 		require.GreaterOrEqual(t, len(users), 2) // admin и новый пользователь
 		require.Len(t, users, int(total))
 
-		// выйдем и проверим можно ли получить пользователя из под гостя
+		// выйдем из админа
 		require.NoError(t, cl.Logout(t.Context()))
+
+		// проверим можно ли получить пользователя из под гостя
 		_, err = cl.GetUser(t.Context(), newUserID)
 		require.Error(t, err)
 
@@ -96,12 +99,30 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		// создадим роль и назначим ее пользователю
 		roleName := funcs.RandStr()
 		require.NoError(t, cl.CreateRole(t.Context(), roleName, nil))
-		require.NoError(t, cl.AddRoleToUser(t.Context(), roleName, newUserID))
+		require.NoError(t, cl.ToggleRoleForUser(t.Context(), roleName, newUserID))
 
-		// проверим что роль присудствует у пользователя
+		// проверим что роль присутствует у пользователя
 		userActual, err = cl.GetUser(t.Context(), newUserID)
 		require.NoError(t, err)
 		require.Contains(t, userActual.MemberOfRole, roleName)
+
+		// привяжем данную роль и к админу
+		require.NoError(t, cl.ToggleRoleForUser(t.Context(), roleName, adminLogin))
+
+		// запросим роль и проверим сколько у скольких человек она привязана, а так же кто привязан
+		roleActual, err := cl.GetRole(t.Context(), roleName)
+		require.NoError(t, err)
+		require.Len(t, roleActual.MemberUser, 2)
+		require.Contains(t, roleActual.MemberUser, newUserID)
+		require.Contains(t, roleActual.MemberUser, adminLogin)
+
+		// удалим привязку роли от пользователя
+		require.NoError(t, cl.ToggleRoleForUser(t.Context(), roleName, newUserID))
+
+		// проверим что у пользователя нет привязки к этой роли
+		userActual, err = cl.GetUser(t.Context(), newUserID)
+		require.NoError(t, err)
+		require.NotContains(t, userActual.MemberOfRole, roleName)
 
 		// удалим роль и пользователя
 		require.NoError(t, cl.DeleteRole(t.Context(), roleName))

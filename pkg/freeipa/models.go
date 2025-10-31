@@ -48,6 +48,7 @@ type Role struct {
 	DN          string
 	Description string
 	ObjectClass []string
+	MemberUser  []string
 }
 
 type User struct {

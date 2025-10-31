@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -338,6 +339,8 @@ func (f *FreeIPA) DeleteUser(ctx context.Context, userID string) error {
 // roles
 
 func (f *FreeIPA) GetRoles(ctx context.Context, limit, offset int32) ([]Role, uint32, error) {
+	// TODO тут надо получить кол-во пользователей данной роли
+
 	u := url.URL{
 		Scheme: f.scheme,
 		Host:   f.host,
@@ -542,7 +545,26 @@ func (f *FreeIPA) DeleteRole(ctx context.Context, name string) error {
 	return nil
 }
 
-func (f *FreeIPA) AddRoleToUser(ctx context.Context, roleName, userID string) error {
+func (f *FreeIPA) ToggleRoleForUser(ctx context.Context, roleName, userID string) error {
+	user, err := f.GetUser(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to get user: %w", err)
+	}
+
+	if slices.Contains(user.MemberOfRole, roleName) {
+		return f.editRoleForUser(ctx, roleName, userID, true)
+	} else {
+		return f.editRoleForUser(ctx, roleName, userID, false)
+	}
+}
+
+func (f *FreeIPA) editRoleForUser(ctx context.Context, roleName, userID string, isRemove bool) error {
+	method := "role_add_member"
+
+	if isRemove {
+		method = "role_remove_member"
+	}
+
 	u := url.URL{
 		Scheme: f.scheme,
 		Host:   f.host,
@@ -552,7 +574,7 @@ func (f *FreeIPA) AddRoleToUser(ctx context.Context, roleName, userID string) er
 		keyOptUser: userID,
 	}
 
-	req, err := f.rpcReq("role_add_member", fmt.Sprintf(`["%s"]`, roleName), opts, true)
+	req, err := f.rpcReq(method, fmt.Sprintf(`["%s"]`, roleName), opts, true)
 	if err != nil {
 		return fmt.Errorf("failed to create jsonrpc-request: %w", err)
 	}

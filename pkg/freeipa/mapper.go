@@ -98,6 +98,9 @@ func mapUserToDTORole(m map[string]any) Role {
 	if v, ok := m["dn"]; ok {
 		role.DN = fmt.Sprintf("%v", v)
 	}
+	if v, ok := m["member_user"]; ok && isNotEmptySlice(v) {
+		role.MemberUser = convertSliceAnyToSliceStr(v.([]any)) //nolint:forcetypeassert
+	}
 
 	return role
 }
