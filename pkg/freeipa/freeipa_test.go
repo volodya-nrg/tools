@@ -20,7 +20,7 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		scheme        = "https"
 		host          = "ipa-dev-nms.fraxis.ru"
 		adminLogin    = "admin"
-		adminPassword = "lk239d81llcSlk932UoPRds"
+		adminPassword = ""
 		timeout       = 5 * time.Second
 	)
 
