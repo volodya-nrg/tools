@@ -20,7 +20,7 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		scheme        = "https"
 		host          = "ipa-dev-nms.fraxis.ru"
 		adminLogin    = "admin"
-		adminPassword = ""
+		adminPassword = "lk239d81llcSlk932UoPRds"
 		timeout       = 5 * time.Second
 	)
 
@@ -115,6 +115,22 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.Len(t, roleActual.MemberUser, 2)
 		require.Contains(t, roleActual.MemberUser, newUserID)
 		require.Contains(t, roleActual.MemberUser, adminLogin)
+
+		// запросим список ролей и посмотрим в нужной привязанных людей
+		roles, total, err := cl.GetRoles(t.Context(), -1, -1)
+		require.NoError(t, err)
+		require.Positive(t, total)
+		isHasNeedUsers := false
+		for _, v := range roles {
+			if v.CN == roleName {
+				require.Len(t, v.MemberUser, 2)
+				require.Contains(t, v.MemberUser, newUserID)
+				require.Contains(t, v.MemberUser, adminLogin)
+				isHasNeedUsers = true
+				break
+			}
+		}
+		require.True(t, isHasNeedUsers)
 
 		// удалим привязку роли от пользователя
 		require.NoError(t, cl.ToggleRoleForUser(t.Context(), roleName, newUserID))

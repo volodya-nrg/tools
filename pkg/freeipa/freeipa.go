@@ -339,8 +339,6 @@ func (f *FreeIPA) DeleteUser(ctx context.Context, userID string) error {
 // roles
 
 func (f *FreeIPA) GetRoles(ctx context.Context, limit, offset int32) ([]Role, uint32, error) {
-	// TODO тут надо получить кол-во пользователей данной роли
-
 	u := url.URL{
 		Scheme: f.scheme,
 		Host:   f.host,
