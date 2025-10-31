@@ -199,6 +199,11 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 			return r.CN == roleName
 		}))
 
+		roleNames := make([]string, len(roles))
+		for i, roleLoc := range roles {
+			roleNames[i] = roleLoc.CN
+		}
+
 		// проверим список v1
 		roles, total, err = cl.GetRoles(t.Context(), 1, 0)
 		require.NoError(t, err)
@@ -216,6 +221,11 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.NoError(t, err)
 		require.GreaterOrEqual(t, total, uint32(1))
 		require.LessOrEqual(t, len(roles), limitDefault)
+
+		// проверим список по именам
+		roles, err = cl.GetByNames(t.Context(), roleNames)
+		require.NoError(t, err)
+		require.Len(t, roles, len(roleNames))
 
 		// удалим роль
 		require.NoError(t, cl.DeleteRole(t.Context(), roleName))

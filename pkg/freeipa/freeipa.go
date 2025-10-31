@@ -339,91 +339,28 @@ func (f *FreeIPA) DeleteUser(ctx context.Context, userID string) error {
 // roles
 
 func (f *FreeIPA) GetRoles(ctx context.Context, limit, offset int32) ([]Role, uint32, error) {
-	u := url.URL{
-		Scheme: f.scheme,
-		Host:   f.host,
-		Path:   "ipa/session/json",
-	}
-	opts := map[string]any{
-		"pkey_only": true,
-	}
-
-	req, err := f.rpcReq("role_find", "", opts, true)
+	roles, total, err := f.getAllRoles(ctx)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to create jsonrpc-request: %w", err)
+		return nil, 0, fmt.Errorf("failed to get all roles: %w", err)
 	}
 
-	resp := responseBasic{}
+	roles = getRangeFromSlice(roles, limit, offset, limitDefault)
+	names := make([]string, len(roles))
 
-	if err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers(), &resp); err != nil {
-		return nil, 0, fmt.Errorf("failed to http-request: %w", err)
-	}
-	if resp.Error != nil {
-		return nil, 0, fmt.Errorf("failed to get roles: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
-	}
-	if resp.Result == nil {
-		return nil, 0, errors.New("response result is nil")
+	for i, v := range roles {
+		names[i] = v.CN
 	}
 
-	rolesTmp, ok := resp.Result.Result.([]any)
-	if !ok {
-		return nil, 0, errors.New("failed to parse roles response")
-	}
-
-	roles := make([]Role, 0, len(rolesTmp))
-	total := resp.Result.Count
-
-	for _, v := range rolesTmp {
-		v2, ok := v.(map[string]any)
-		if !ok {
-			return nil, 0, errors.New("failed to parse role response")
-		}
-
-		roles = append(roles, mapUserToDTORole(v2))
-	}
-
-	targetRoles := getRangeFromSlice(roles, limit, offset, limitDefault)
-	methods := make([]string, len(targetRoles))
-	opts = map[string]any{
-		"all":        true, // получить полную информацию о роли
-		"no_members": true, // исключить информацию о группах
-	}
-
-	for i, role := range targetRoles {
-		method, err := f.rpcReq("role_show", fmt.Sprintf(`["%s"]`, role.CN), opts, false)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to create jsonrpc-request (role_show): %w", err)
-		}
-
-		methods[i] = string(method)
-	}
-
-	req, err = f.rpcReq("batch", fmt.Sprintf(`[%s]`, strings.Join(methods, ",")), nil, true)
+	roles, err = f.getAllRolesByName(ctx, names)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to create jsonrpc-request (batch): %w", err)
-	}
-
-	resp = responseBasic{}
-
-	if err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers(), &resp); err != nil {
-		return nil, 0, fmt.Errorf("failed to http-request: %w", err)
-	}
-	if resp.Error != nil {
-		return nil, 0, fmt.Errorf("failed to get roles: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
-	}
-	if resp.Result == nil {
-		return nil, 0, errors.New("response result is nil")
-	}
-
-	roles = make([]Role, 0, len(resp.Result.Results))
-
-	for _, result := range resp.Result.Results {
-		if roleTmp, ok := result.Result.(map[string]any); ok {
-			roles = append(roles, mapUserToDTORole(roleTmp))
-		}
+		return nil, 0, fmt.Errorf("failed to get all roles by name: %w", err)
 	}
 
 	return roles, total, nil
+}
+
+func (f *FreeIPA) GetByNames(ctx context.Context, names []string) ([]Role, error) {
+	return f.getAllRolesByName(ctx, names)
 }
 
 func (f *FreeIPA) GetRole(ctx context.Context, name string) (*Role, error) {
@@ -587,6 +524,102 @@ func (f *FreeIPA) editRoleForUser(ctx context.Context, roleName, userID string, 
 	}
 
 	return nil
+}
+
+func (f *FreeIPA) getAllRoles(ctx context.Context) ([]Role, uint32, error) {
+	u := url.URL{
+		Scheme: f.scheme,
+		Host:   f.host,
+		Path:   "ipa/session/json",
+	}
+	opts := map[string]any{
+		"pkey_only": true,
+	}
+
+	req, err := f.rpcReq("role_find", "", opts, true)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create jsonrpc-request: %w", err)
+	}
+
+	resp := responseBasic{}
+
+	if err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers(), &resp); err != nil {
+		return nil, 0, fmt.Errorf("failed to http-request: %w", err)
+	}
+	if resp.Error != nil {
+		return nil, 0, fmt.Errorf("failed to get roles: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+	}
+	if resp.Result == nil {
+		return nil, 0, errors.New("response result is nil")
+	}
+
+	rolesTmp, ok := resp.Result.Result.([]any)
+	if !ok {
+		return nil, 0, errors.New("failed to parse roles response")
+	}
+
+	roles := make([]Role, 0, len(rolesTmp))
+	total := resp.Result.Count
+
+	for _, v := range rolesTmp {
+		v2, ok := v.(map[string]any)
+		if !ok {
+			return nil, 0, errors.New("failed to parse role response")
+		}
+
+		roles = append(roles, mapUserToDTORole(v2))
+	}
+
+	return roles, total, nil
+}
+
+func (f *FreeIPA) getAllRolesByName(ctx context.Context, names []string) ([]Role, error) {
+	methods := make([]string, len(names))
+	u := url.URL{
+		Scheme: f.scheme,
+		Host:   f.host,
+		Path:   "ipa/session/json",
+	}
+	opts := map[string]any{
+		"all":        true, // получить полную информацию о роли
+		"no_members": true, // исключить информацию о группах
+	}
+
+	for i, name := range names {
+		method, err := f.rpcReq("role_show", fmt.Sprintf(`["%s"]`, name), opts, false)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create jsonrpc-request (role_show): %w", err)
+		}
+
+		methods[i] = string(method)
+	}
+
+	req, err := f.rpcReq("batch", fmt.Sprintf(`[%s]`, strings.Join(methods, ",")), nil, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create jsonrpc-request (batch): %w", err)
+	}
+
+	resp := responseBasic{}
+
+	if err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers(), &resp); err != nil {
+		return nil, fmt.Errorf("failed to http-request: %w", err)
+	}
+	if resp.Error != nil {
+		return nil, fmt.Errorf("failed to get roles: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+	}
+	if resp.Result == nil {
+		return nil, errors.New("response result is nil")
+	}
+
+	roles := make([]Role, 0, len(resp.Result.Results))
+
+	for _, result := range resp.Result.Results {
+		if roleTmp, ok := result.Result.(map[string]any); ok {
+			roles = append(roles, mapUserToDTORole(roleTmp))
+		}
+	}
+
+	return roles, nil
 }
 
 func (f *FreeIPA) headers() map[string]string {
