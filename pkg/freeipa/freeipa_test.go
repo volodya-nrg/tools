@@ -1,7 +1,9 @@
 package freeipa
 
 import (
+	"encoding/json"
 	"math"
+	"os"
 	"slices"
 	"testing"
 	"time"
@@ -11,27 +13,41 @@ import (
 	"github.com/volodya-nrg/tools/pkg/funcs"
 )
 
+type config struct {
+	Scheme   string `json:"scheme"`
+	Host     string `json:"host"`
+	Login    string `json:"login"`
+	Password string `json:"password"`
+}
+
 func TestFreeIPA(t *testing.T) { //nolint:tparallel
 	t.Parallel()
 
 	const (
-		password1     = "password1"
-		password2     = "password2"
-		scheme        = "https"
-		host          = "ipa-dev-nms.fraxis.ru"
-		adminLogin    = "admin"
-		adminPassword = ""
-		timeout       = 5 * time.Second
+		password1 = "password1"
+		password2 = "password2"
+		timeout   = 5 * time.Second
+	)
+
+	configBytes, err := os.ReadFile("config.json")
+	require.NoError(t, err)
+
+	configLoc := &config{}
+	require.NoError(t, json.Unmarshal(configBytes, configLoc))
+
+	var (
+		adminLogin = configLoc.Login
+		adminPass  = configLoc.Password
 	)
 
 	// создадим клиента
-	cl, err := NewFreeIPA(scheme, host, timeout)
+	cl, err := NewFreeIPA(configLoc.Scheme, configLoc.Host, timeout)
 	require.NoError(t, err)
 	require.NotNil(t, cl)
 
 	t.Run("check users", func(t *testing.T) { //nolint:paralleltest
 		// зайдем под админом
-		require.NoError(t, cl.Login(t.Context(), adminLogin, adminPassword))
+		require.NoError(t, cl.Login(t.Context(), adminLogin, adminPass))
 
 		newUserID := funcs.RandStr()
 
@@ -71,7 +87,7 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.NoError(t, cl.Logout(t.Context()))
 
 		// зайдем под админом, чтоб обновить все поля, т.к. у него привилегий больше
-		require.NoError(t, cl.Login(t.Context(), adminLogin, adminPassword))
+		require.NoError(t, cl.Login(t.Context(), adminLogin, adminPass))
 
 		// обновим пользователя
 		newPassExp := time.Now().AddDate(0, 3, 0)
@@ -152,7 +168,7 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.NoError(t, cl.Logout(t.Context()))
 	})
 	t.Run("check roles", func(t *testing.T) { //nolint:paralleltest
-		require.NoError(t, cl.Login(t.Context(), adminLogin, adminPassword))
+		require.NoError(t, cl.Login(t.Context(), adminLogin, adminPass))
 
 		roleName := funcs.RandStr()
 		roleDesc := funcs.RandStr()
