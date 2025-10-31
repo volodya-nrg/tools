@@ -3,5 +3,6 @@
 
 *.log
 *.yml
+*.json
 
 Makefile
