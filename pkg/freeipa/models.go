@@ -37,10 +37,16 @@ type responseMessage struct {
 }
 
 type responseItem struct {
-	Result  any            `json:"result"`
-	Value   string         `json:"value"` // uid
-	Summary *string        `json:"summary"`
-	Error   *responseError `json:"error"`
+	Result  any     `json:"result"`
+	Value   string  `json:"value"` // uid
+	Summary *string `json:"summary"`
+	// Error   *responseError `json:"error"`
+	Error     string `json:"error"`
+	ErrorCode int32  `json:"error_code"`
+	ErrorName string `json:"error_name"`
+	ErrorKw   struct {
+		Reason string `json:"reason"`
+	} `json:"error_kw"`
 }
 
 type Role struct {

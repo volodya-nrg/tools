@@ -182,6 +182,11 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.Equal(t, roleName, role.CN)
 		require.Equal(t, roleDesc, role.Description)
 
+		// проверим явно что она есть
+		isHas, err := cl.HasRole(t.Context(), roleName)
+		require.NoError(t, err)
+		require.True(t, isHas)
+
 		// изменим роль
 		roleDesc2 := funcs.RandStr()
 		require.NoError(t, cl.UpdateRole(t.Context(), role.CN, roleDesc2))
@@ -227,12 +232,21 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.NoError(t, err)
 		require.Len(t, roles, len(roleNames))
 
+		// получим по именам, но запросим левую роль, нужно чтоб response отработал корректно
+		roles, err = cl.GetByNames(t.Context(), []string{funcs.RandStr()})
+		require.Error(t, err)
+
 		// удалим роль
 		require.NoError(t, cl.DeleteRole(t.Context(), roleName))
 
 		// получим роль
 		_, err = cl.GetRole(t.Context(), roleName)
 		require.Error(t, err)
+
+		// проверим через другой метод
+		isHas, err = cl.HasRole(t.Context(), roleName)
+		require.NoError(t, err)
+		require.False(t, isHas)
 
 		// выйдем из под админа
 		require.NoError(t, cl.Logout(t.Context()))

@@ -338,6 +338,7 @@ func (f *FreeIPA) DeleteUser(ctx context.Context, userID string) error {
 
 // roles
 
+// GetRoles получение ролей с фиксированным лимитом
 func (f *FreeIPA) GetRoles(ctx context.Context, limit, offset int32) ([]Role, uint32, error) {
 	roles, total, err := f.getAllRoles(ctx)
 	if err != nil {
@@ -359,6 +360,7 @@ func (f *FreeIPA) GetRoles(ctx context.Context, limit, offset int32) ([]Role, ui
 	return roles, total, nil
 }
 
+// GetByNames получение ролей по имени, если есть отсутствующая роль, то будет ошибка
 func (f *FreeIPA) GetByNames(ctx context.Context, names []string) ([]Role, error) {
 	return f.getAllRolesByName(ctx, names)
 }
@@ -398,6 +400,17 @@ func (f *FreeIPA) GetRole(ctx context.Context, name string) (*Role, error) {
 	role := mapUserToDTORole(roleTmp)
 
 	return &role, nil
+}
+
+func (f *FreeIPA) HasRole(ctx context.Context, name string) (bool, error) {
+	roles, _, err := f.getAllRoles(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to get all roles: %w", err)
+	}
+
+	return slices.ContainsFunc(roles, func(role Role) bool {
+		return role.CN == name
+	}), nil
 }
 
 func (f *FreeIPA) CreateRole(ctx context.Context, name string, desc *string) error {
@@ -609,6 +622,16 @@ func (f *FreeIPA) getAllRolesByName(ctx context.Context, names []string) ([]Role
 	}
 	if resp.Result == nil {
 		return nil, errors.New("response result is nil")
+	}
+
+	var errs []error
+	for _, result := range resp.Result.Results {
+		if result.Error != "" {
+			errs = append(errs, errors.New(result.Error))
+		}
+	}
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
 	}
 
 	roles := make([]Role, 0, len(resp.Result.Results))
