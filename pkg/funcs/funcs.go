@@ -3,6 +3,7 @@ package funcs
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,8 +11,16 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
+
+	interceptorstimeout "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/timeout"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 var (
@@ -117,4 +126,37 @@ func StrToTime(str string) time.Time {
 		return time.Time{}
 	}
 	return t
+}
+
+func GrpcClientConn(addr string, timeout time.Duration, tlsConfig *tls.Config) (*grpc.ClientConn, error) {
+	transportCreds := insecure.NewCredentials()
+	if tlsConfig != nil {
+		transportCreds = credentials.NewTLS(tlsConfig)
+	}
+
+	unaryInterceptors := []grpc.UnaryClientInterceptor{
+		interceptorstimeout.UnaryClientInterceptor(timeout),
+	}
+	var streamInterceptors []grpc.StreamClientInterceptor
+
+	dialOptions := []grpc.DialOption{
+		grpc.WithTransportCredentials(transportCreds),
+		grpc.WithChainUnaryInterceptor(unaryInterceptors...),
+		grpc.WithChainStreamInterceptor(streamInterceptors...),
+	}
+
+	conn, err := grpc.NewClient(addr, dialOptions...)
+	if err != nil {
+		return nil, fmt.Errorf("could not create a new grpc-client: %w", err)
+	}
+
+	return conn, nil
+}
+
+func StopSignalNotify(ctx context.Context, cancel context.CancelFunc) {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	reason := <-c
+	slog.InfoContext(ctx, "program stopped", slog.String("reason", reason.String()))
+	cancel()
 }
