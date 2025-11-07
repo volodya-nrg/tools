@@ -228,12 +228,12 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.LessOrEqual(t, len(roles), limitDefault)
 
 		// проверим список по именам
-		roles, err = cl.GetByNames(t.Context(), roleNames)
+		roles, err = cl.GetRolesByName(t.Context(), roleNames)
 		require.NoError(t, err)
 		require.Len(t, roles, len(roleNames))
 
 		// получим по именам, но запросим левую роль, нужно чтоб response отработал корректно
-		roles, err = cl.GetByNames(t.Context(), []string{funcs.RandStr()})
+		_, err = cl.GetRolesByName(t.Context(), []string{funcs.RandStr()})
 		require.Error(t, err)
 
 		// удалим роль

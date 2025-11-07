@@ -360,8 +360,8 @@ func (f *FreeIPA) GetRoles(ctx context.Context, limit, offset int32) ([]Role, ui
 	return roles, total, nil
 }
 
-// GetByNames получение ролей по имени, если есть отсутствующая роль, то будет ошибка
-func (f *FreeIPA) GetByNames(ctx context.Context, names []string) ([]Role, error) {
+// GetRolesByName получение ролей по имени, если есть отсутствующая роль, то будет ошибка
+func (f *FreeIPA) GetRolesByName(ctx context.Context, names []string) ([]Role, error) {
 	return f.getAllRolesByName(ctx, names)
 }
 
