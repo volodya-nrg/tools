@@ -13,13 +13,13 @@ import (
 	transactorX "github.com/volodya-nrg/tools/pkg/db/postgres/transactor"
 )
 
-type transactor interface {
+type Transactor interface {
 	Conn(ctx context.Context) transactorX.Connection
 	WithinTx(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
 type BaseTable struct {
-	Transactor transactor
+	Transactor Transactor
 	TblName    string
 	Fields     []string
 }
@@ -81,7 +81,7 @@ func (b *BaseTable) Total(
 	return result, nil
 }
 
-func NewBaseTable(transactor transactor, tblName string, fields []string) BaseTable {
+func NewBaseTable(transactor Transactor, tblName string, fields []string) BaseTable {
 	return BaseTable{
 		Transactor: transactor,
 		TblName:    tblName,
