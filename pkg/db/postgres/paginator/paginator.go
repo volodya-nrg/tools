@@ -8,13 +8,11 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-var ErrMissingField = errors.New("missing field")
-
 func Prepare(
 	fieldNameForOrder,
 	filterQuery,
 	filterField string,
-	limitSrc,
+	limit,
 	offset int32,
 	isSortByAsc bool,
 ) (string, string, pgx.StrictNamedArgs, error) {
@@ -23,11 +21,11 @@ func Prepare(
 	namedArgs := pgx.StrictNamedArgs{}
 
 	if fieldNameForOrder == "" {
-		return "", "", nil, ErrMissingField
+		return "", "", nil, errors.New("field name for order is required")
 	}
 	if filterQuery != "" {
 		if filterField == "" {
-			return "", "", nil, ErrMissingField
+			return "", "", nil, errors.New("filter-field is required")
 		}
 
 		strBuilder.WriteString(fmt.Sprintf("WHERE %s ILIKE '%%' || @query || '%%'", filterField))
@@ -41,8 +39,8 @@ func Prepare(
 
 	strBuilder.WriteString(fmt.Sprintf("ORDER BY %s %s ", fieldNameForOrder, sort))
 
-	if limitSrc > 0 {
-		strBuilder.WriteString(fmt.Sprintf("LIMIT %d ", limitSrc))
+	if limit > 0 {
+		strBuilder.WriteString(fmt.Sprintf("LIMIT %d ", limit))
 	}
 	if offset > 0 {
 		strBuilder.WriteString(fmt.Sprintf("OFFSET %d ", offset))
