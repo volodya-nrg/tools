@@ -7,9 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/volodya-nrg/tools/pkg/errors/custom"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"io"
 	"log/slog"
 	"math/rand"
@@ -23,8 +20,12 @@ import (
 
 	interceptorstimeout "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/timeout"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
+
+	"github.com/volodya-nrg/tools/pkg/errors/custom"
 )
 
 var (
