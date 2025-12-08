@@ -125,6 +125,20 @@ func RandIntByRange(minSrc, maxSrc int) int {
 	return randSource.Intn(maxSrc-minSrc) + minSrc
 }
 
+func RandIP() string {
+	return fmt.Sprintf(
+		"%d.%d.%d.%d",
+		RandIntByRange(0, 255),
+		RandIntByRange(0, 255),
+		RandIntByRange(0, 255),
+		RandIntByRange(0, 255),
+	)
+}
+
+func RandPort() int {
+	return RandIntByRange(1024, 65535)
+}
+
 func StrToTime(str string) time.Time {
 	t, err := time.Parse(time.DateTime, str)
 	if err != nil {
