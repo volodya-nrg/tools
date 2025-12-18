@@ -6,7 +6,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// ServerStream обертка для ServerStream interface
+// ServerStream обертка для ServerStream (original) interface
 type ServerStream struct {
 	grpc.ServerStream
 
@@ -15,4 +15,11 @@ type ServerStream struct {
 
 func (s *ServerStream) Context() context.Context {
 	return s.ctx
+}
+
+func NewServerStream(ctx context.Context, ss grpc.ServerStream) *ServerStream {
+	return &ServerStream{
+		ServerStream: ss,
+		ctx:          ctx,
+	}
 }
