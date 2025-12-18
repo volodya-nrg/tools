@@ -17,9 +17,10 @@ func (s *ServerStream) Context() context.Context {
 	return s.ctx
 }
 
-func NewServerStream(ss grpc.ServerStream) *ServerStream {
+// NewServerStream ctx может приходить другой
+func NewServerStream(ctx context.Context, ss grpc.ServerStream) *ServerStream {
 	return &ServerStream{
 		ServerStream: ss,
-		ctx:          ss.Context(),
+		ctx:          ctx,
 	}
 }
