@@ -17,9 +17,9 @@ func (s *ServerStream) Context() context.Context {
 	return s.ctx
 }
 
-func NewServerStream(ctx context.Context, ss grpc.ServerStream) *ServerStream {
+func NewServerStream(ss grpc.ServerStream) *ServerStream {
 	return &ServerStream{
 		ServerStream: ss,
-		ctx:          ctx,
+		ctx:          ss.Context(),
 	}
 }
