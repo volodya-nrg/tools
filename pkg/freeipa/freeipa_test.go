@@ -60,12 +60,12 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 			UserPassword:          funcs.Pointer(password1),
 			KRBPasswordExpiration: funcs.Pointer(time.Now().AddDate(0, 3, 0)),
 			NsAccountLock:         funcs.Pointer(false),
-			CN:                    funcs.Pointer(newUserID + "-cn"),
+			CN:                    funcs.Pointer(newUserID + "-fullname"),
 			TelephoneNumber:       funcs.Pointer(newUserID + "-telephone-number"),
 			Mobile:                funcs.Pointer(newUserID + "-mobile"),
 			Title:                 funcs.Pointer(newUserID + "-title"),
 			OU:                    funcs.Pointer(newUserID + "-ou"),
-			AddAttr:               []string{"o=Company", "jpegphoto=path/to/photo.jpg"},
+			AddAttr:               []string{"o=MyCompany", "jpegphoto=path/to/photo.jpg"},
 		}
 		userExpected, err := cl.CreateUser(t.Context(), reqUser)
 		require.NoError(t, err)

@@ -59,35 +59,35 @@ type Role struct {
 
 type User struct {
 	UID                   string
-	GivenName             string
-	SN                    string
+	GivenName             string // имя
+	SN                    string // фамилия
 	DN                    string
 	MemberOfGroup         []string
 	MemberOfRole          []string
 	Mail                  string
 	NsAccountLock         bool
 	KRBPasswordExpiration time.Time
-	CN                    string
-	TelephoneNumber       string
-	Mobile                string
-	Title                 string
-	Organization          string
-	OrgUnit               string
-	JPEGPhoto             string
+	CN                    string // ФИО
+	TelephoneNumber       string // рабочий телефон
+	Mobile                string // мобильный телефон
+	Title                 string // должность
+	Organization          string // компания
+	OrgUnit               string // отдел в компании
+	JPEGPhoto             string // аватарка
 }
 
 type RequestUser struct {
-	UID                   string // id
-	GivenName             string // имя
-	SN                    string // фамилия
-	Mail                  *string
+	UID                   string     // id
+	GivenName             string     // имя
+	SN                    string     // фамилия
+	Mail                  *string    // е-мэйл
 	UserPassword          *string    // новый пароль
 	KRBPasswordExpiration *time.Time // время действия пароля
 	NsAccountLock         *bool      // заблокирован ли аккаунт
-	CN                    *string    // fullname
-	TelephoneNumber       *string
-	Mobile                *string
-	Title                 *string  // должность
-	OU                    *string  // отдел (orgunit)
-	AddAttr               []string // доп. аттрибуты (компания, аватарка)
+	CN                    *string    // fullname, FIO
+	TelephoneNumber       *string    // рабочий телефон
+	Mobile                *string    // мобильный телефон
+	Title                 *string    // должность
+	OU                    *string    // отдел (orgunit)
+	AddAttr               []string   // доп. аттрибуты (компания, аватарка)
 }
