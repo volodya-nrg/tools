@@ -67,14 +67,27 @@ type User struct {
 	Mail                  string
 	NsAccountLock         bool
 	KRBPasswordExpiration time.Time
+	CN                    string
+	TelephoneNumber       string
+	Mobile                string
+	Title                 string
+	Organization          string
+	OrgUnit               string
+	JPEGPhoto             string
 }
 
 type RequestUser struct {
-	UID                   string
-	GivenName             string
-	SN                    string
+	UID                   string // id
+	GivenName             string // имя
+	SN                    string // фамилия
 	Mail                  *string
-	UserPassword          *string
-	KRBPasswordExpiration *time.Time
-	NsAccountLock         *bool
+	UserPassword          *string    // новый пароль
+	KRBPasswordExpiration *time.Time // время действия пароля
+	NsAccountLock         *bool      // заблокирован ли аккаунт
+	CN                    *string    // fullname
+	TelephoneNumber       *string
+	Mobile                *string
+	Title                 *string  // должность
+	OU                    *string  // отдел (orgunit)
+	AddAttr               []string // доп. аттрибуты (компания, аватарка)
 }

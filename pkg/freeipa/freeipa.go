@@ -21,6 +21,8 @@ const (
 	limitDefault                = 20
 	timeLayout                  = "20060102150405Z"
 	apiVersion                  = "2.254"
+	keyOptUID                   = "uid"
+	keyOptDN                    = "dn"
 	keyOptGivenName             = "givenname"
 	keyOptSN                    = "sn"
 	keyOptUser                  = "user"
@@ -31,6 +33,18 @@ const (
 	keyOptRandom                = "random"
 	keyOptVersion               = "version"
 	keyOptDescription           = "description"
+	keyOptCN                    = "cn"
+	keyOptTelephoneNumber       = "telephonenumber"
+	keyOptMobile                = "mobile"
+	keyOptTitle                 = "title"
+	keyOptOU                    = "ou"
+	keyOptO                     = "o" // organization
+	keyOptMemberofGroup         = "memberof_group"
+	keyOptMemberofRole          = "memberof_role"
+	keyOptAddAttr               = "addattr"
+	keyOptJPEGPhoto             = "jpegphoto"
+	keyOptObjectClass           = "objectclass"
+	keyOptMemberUser            = "member_user"
 )
 
 type FreeIPA struct {
@@ -238,6 +252,24 @@ func (f *FreeIPA) CreateUser(ctx context.Context, reqUser RequestUser) (*User, e
 	}
 	if reqUser.NsAccountLock != nil {
 		opts[keyOptNSAccountLock] = *reqUser.NsAccountLock
+	}
+	if reqUser.CN != nil {
+		opts[keyOptCN] = *reqUser.CN
+	}
+	if reqUser.TelephoneNumber != nil {
+		opts[keyOptTelephoneNumber] = *reqUser.TelephoneNumber
+	}
+	if reqUser.Mobile != nil {
+		opts[keyOptMobile] = *reqUser.Mobile
+	}
+	if reqUser.Title != nil {
+		opts[keyOptTitle] = *reqUser.Title
+	}
+	if reqUser.OU != nil {
+		opts[keyOptOU] = *reqUser.OU
+	}
+	if len(reqUser.AddAttr) > 0 {
+		opts[keyOptAddAttr] = reqUser.AddAttr
 	}
 
 	req, err := f.rpcReq("user_add", fmt.Sprintf(`["%s"]`, reqUser.UID), opts, true)
