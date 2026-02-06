@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -39,11 +38,10 @@ func HTTPRequest(
 	u url.URL,
 	body []byte,
 	headers map[string]string,
-	receiver any,
-) error {
+) (int, []byte, error) {
 	req, err := http.NewRequestWithContext(ctx, method, u.String(), bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return 0, nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded") // default
@@ -54,7 +52,7 @@ func HTTPRequest(
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to execute request: %w", err)
+		return 0, nil, fmt.Errorf("failed to execute request: %w", err)
 	}
 
 	defer func() {
@@ -65,15 +63,7 @@ func HTTPRequest(
 
 	bodyBytes, err := io.ReadAll(resp.Body) // cut data (once)
 	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		return fmt.Errorf( //nolint:err113
-			"response has statusCode: %d, status: %s",
-			resp.StatusCode,
-			resp.Status,
-		)
+		return 0, nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	// задаём cookie если только они есть, иначе будет паника
@@ -81,13 +71,7 @@ func HTTPRequest(
 		client.Jar.SetCookies(req.URL, cooks)
 	}
 
-	if receiver != nil {
-		if err = json.Unmarshal(bodyBytes, receiver); err != nil {
-			return fmt.Errorf("failed to unmarshal response body to receiver: %w (%s)", err, string(bodyBytes))
-		}
-	}
-
-	return nil
+	return resp.StatusCode, bodyBytes, nil // отдаем данные как есть, принимающая сторона распределится ими
 }
 
 func RandStrLimit(n int) string {
