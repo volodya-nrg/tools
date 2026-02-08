@@ -66,11 +66,6 @@ func HTTPRequest(
 		return 0, nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	// задаём cookie если только они есть, иначе будет паника
-	if cooks := resp.Cookies(); len(cooks) > 0 {
-		client.Jar.SetCookies(req.URL, cooks)
-	}
-
 	return resp.StatusCode, bodyBytes, nil // отдаем данные как есть, принимающая сторона распределится ими
 }
 

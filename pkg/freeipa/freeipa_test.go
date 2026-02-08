@@ -3,6 +3,7 @@ package freeipa
 import (
 	"encoding/json"
 	"math"
+	"net/http"
 	"os"
 	"slices"
 	"testing"
@@ -38,12 +39,8 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 	var (
 		adminLogin = configLoc.Login
 		adminPass  = configLoc.Password
+		cl         = NewFreeIPA(configLoc.Scheme, configLoc.Host, &http.Transport{}, timeout)
 	)
-
-	// создадим клиента
-	cl, err := NewFreeIPA(configLoc.Scheme, configLoc.Host, timeout)
-	require.NoError(t, err)
-	require.NotNil(t, cl)
 
 	t.Run("check users", func(t *testing.T) { //nolint:paralleltest
 		// зайдем под админом

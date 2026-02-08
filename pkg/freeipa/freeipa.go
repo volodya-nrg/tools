@@ -74,8 +74,12 @@ func (f *FreeIPA) Login(ctx context.Context, userID, password string) error {
 		"Referer": fmt.Sprintf("%s://%s/ipa", f.scheme, f.host),
 	}
 
-	if err := f.httpRequest(ctx, f.client, http.MethodPost, u, []byte(values.Encode()), headers, nil); err != nil {
+	statusCode, _, err := f.httpRequest(ctx, f.client, http.MethodPost, u, []byte(values.Encode()), headers)
+	if err != nil {
 		return fmt.Errorf("failed to http-request: %w", err)
+	}
+	if err = f.checkStatusCode(statusCode); err != nil {
+		return err
 	}
 
 	return nil
@@ -95,8 +99,15 @@ func (f *FreeIPA) Logout(ctx context.Context) error {
 
 	resp := responseBasic{}
 
-	if err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers(), &resp); err != nil {
+	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
+	if err != nil {
 		return fmt.Errorf("failed to http-request: %w", err)
+	}
+	if err = f.checkStatusCode(statusCode); err != nil {
+		return err
+	}
+	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
+		return fmt.Errorf("failed to unmarshal json-response: %w", err)
 	}
 	if resp.Error != nil {
 		return fmt.Errorf("failed to logout: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
@@ -125,8 +136,15 @@ func (f *FreeIPA) GetUsers(ctx context.Context, limit, offset int32) ([]User, ui
 
 	resp := responseBasic{}
 
-	if err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers(), &resp); err != nil {
+	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
+	if err != nil {
 		return nil, 0, fmt.Errorf("failed to http-request: %w", err)
+	}
+	if err = f.checkStatusCode(statusCode); err != nil {
+		return nil, 0, err
+	}
+	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
+		return nil, 0, fmt.Errorf("failed to unmarshal json-response: %w", err)
 	}
 	if resp.Error != nil {
 		return nil, 0, fmt.Errorf("failed to get users (pkey_only): code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
@@ -170,8 +188,15 @@ func (f *FreeIPA) GetUsers(ctx context.Context, limit, offset int32) ([]User, ui
 
 	resp = responseBasic{}
 
-	if err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers(), &resp); err != nil {
+	statusCode, bodyBytes, err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
+	if err != nil {
 		return nil, 0, fmt.Errorf("failed to http-request: %w", err)
+	}
+	if err = f.checkStatusCode(statusCode); err != nil {
+		return nil, 0, err
+	}
+	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
+		return nil, 0, fmt.Errorf("failed to unmarshal json-response: %w", err)
 	}
 	if resp.Error != nil {
 		return nil, 0, fmt.Errorf("failed to get users: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
@@ -208,8 +233,15 @@ func (f *FreeIPA) GetUser(ctx context.Context, userID string) (*User, error) {
 
 	resp := responseBasic{}
 
-	if err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers(), &resp); err != nil {
+	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
+	if err != nil {
 		return nil, fmt.Errorf("failed to http-request: %w", err)
+	}
+	if err = f.checkStatusCode(statusCode); err != nil {
+		return nil, err
+	}
+	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal json-response: %w", err)
 	}
 	if resp.Error != nil {
 		return nil, fmt.Errorf("failed to get item: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
@@ -279,8 +311,15 @@ func (f *FreeIPA) CreateUser(ctx context.Context, reqUser RequestUser) (*User, e
 
 	resp := responseBasic{}
 
-	if err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers(), &resp); err != nil {
+	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
+	if err != nil {
 		return nil, fmt.Errorf("failed to http-request: %w", err)
+	}
+	if err = f.checkStatusCode(statusCode); err != nil {
+		return nil, err
+	}
+	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal json-response: %w", err)
 	}
 	if resp.Error != nil {
 		return nil, fmt.Errorf("failed to create item: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
@@ -334,8 +373,15 @@ func (f *FreeIPA) UpdateUser(ctx context.Context, reqUser RequestUser) error {
 
 	resp := responseBasic{}
 
-	if err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers(), &resp); err != nil {
+	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
+	if err != nil {
 		return fmt.Errorf("failed to http-request: %w", err)
+	}
+	if err = f.checkStatusCode(statusCode); err != nil {
+		return err
+	}
+	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
+		return fmt.Errorf("failed to unmarshal json-response: %w", err)
 	}
 	if resp.Error != nil {
 		return fmt.Errorf("failed to update item: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
@@ -358,8 +404,15 @@ func (f *FreeIPA) DeleteUser(ctx context.Context, userID string) error {
 
 	resp := responseBasic{}
 
-	if err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers(), &resp); err != nil {
+	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
+	if err != nil {
 		return fmt.Errorf("failed to http-request: %w", err)
+	}
+	if err = f.checkStatusCode(statusCode); err != nil {
+		return err
+	}
+	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
+		return fmt.Errorf("failed to unmarshal json-response: %w", err)
 	}
 	if resp.Error != nil {
 		return fmt.Errorf("failed to delete item: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
@@ -414,8 +467,15 @@ func (f *FreeIPA) GetRole(ctx context.Context, name string) (*Role, error) {
 
 	resp := responseBasic{}
 
-	if err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers(), &resp); err != nil {
+	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
+	if err != nil {
 		return nil, fmt.Errorf("failed to http-request: %w", err)
+	}
+	if err = f.checkStatusCode(statusCode); err != nil {
+		return nil, err
+	}
+	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal json-response: %w", err)
 	}
 	if resp.Error != nil {
 		return nil, fmt.Errorf("failed to get item: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
@@ -464,8 +524,15 @@ func (f *FreeIPA) CreateRole(ctx context.Context, name string, desc *string) err
 
 	resp := responseBasic{}
 
-	if err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers(), &resp); err != nil {
+	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
+	if err != nil {
 		return fmt.Errorf("failed to http-request: %w", err)
+	}
+	if err = f.checkStatusCode(statusCode); err != nil {
+		return err
+	}
+	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
+		return fmt.Errorf("failed to unmarshal json-response: %w", err)
 	}
 	if resp.Error != nil {
 		return fmt.Errorf("failed to create item: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
@@ -491,8 +558,15 @@ func (f *FreeIPA) UpdateRole(ctx context.Context, name, desc string) error {
 
 	resp := responseBasic{}
 
-	if err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers(), &resp); err != nil {
+	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
+	if err != nil {
 		return fmt.Errorf("failed to http-request: %w", err)
+	}
+	if err = f.checkStatusCode(statusCode); err != nil {
+		return err
+	}
+	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
+		return fmt.Errorf("failed to unmarshal json-response: %w", err)
 	}
 	if resp.Error != nil {
 		return fmt.Errorf("failed to update item: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
@@ -515,8 +589,15 @@ func (f *FreeIPA) DeleteRole(ctx context.Context, name string) error {
 
 	resp := responseBasic{}
 
-	if err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers(), &resp); err != nil {
+	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
+	if err != nil {
 		return fmt.Errorf("failed to http-request: %w", err)
+	}
+	if err = f.checkStatusCode(statusCode); err != nil {
+		return err
+	}
+	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
+		return fmt.Errorf("failed to unmarshal json-response: %w", err)
 	}
 	if resp.Error != nil {
 		return fmt.Errorf("failed to delete item: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
@@ -561,8 +642,15 @@ func (f *FreeIPA) editRoleForUser(ctx context.Context, roleName, userID string, 
 
 	resp := responseBasic{}
 
-	if err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers(), &resp); err != nil {
+	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
+	if err != nil {
 		return fmt.Errorf("failed to http-request: %w", err)
+	}
+	if err = f.checkStatusCode(statusCode); err != nil {
+		return err
+	}
+	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
+		return fmt.Errorf("failed to unmarshal json-response: %w", err)
 	}
 	if resp.Error != nil {
 		return fmt.Errorf("failed to add role to user: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
@@ -588,8 +676,15 @@ func (f *FreeIPA) getAllRoles(ctx context.Context) ([]Role, uint32, error) {
 
 	resp := responseBasic{}
 
-	if err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers(), &resp); err != nil {
+	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
+	if err != nil {
 		return nil, 0, fmt.Errorf("failed to http-request: %w", err)
+	}
+	if err = f.checkStatusCode(statusCode); err != nil {
+		return nil, 0, err
+	}
+	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
+		return nil, 0, fmt.Errorf("failed to unmarshal json-response: %w", err)
 	}
 	if resp.Error != nil {
 		return nil, 0, fmt.Errorf("failed to get roles: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
@@ -646,8 +741,15 @@ func (f *FreeIPA) getAllRolesByName(ctx context.Context, names []string) ([]Role
 
 	resp := responseBasic{}
 
-	if err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers(), &resp); err != nil {
+	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
+	if err != nil {
 		return nil, fmt.Errorf("failed to http-request: %w", err)
+	}
+	if err = f.checkStatusCode(statusCode); err != nil {
+		return nil, err
+	}
+	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal json-response: %w", err)
 	}
 	if resp.Error != nil {
 		return nil, fmt.Errorf("failed to get roles: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
@@ -724,24 +826,27 @@ func (f *FreeIPA) httpRequest(
 	u url.URL,
 	body []byte,
 	headers map[string]string,
-	receiver any,
-) error {
-	return funcs.HTTPRequest(ctx, client, method, u, body, headers, receiver)
+) (int, []byte, error) {
+	return funcs.HTTPRequest(ctx, client, method, u, body, headers)
 }
 
-func NewFreeIPA(scheme, host string, timeout time.Duration) (*FreeIPA, error) {
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create cookie-jar: %w", err)
+func (f *FreeIPA) checkStatusCode(statusCode int) error {
+	if statusCode >= http.StatusBadRequest {
+		return fmt.Errorf("status code is %d", statusCode)
 	}
+	return nil
+}
 
+func NewFreeIPA(scheme, host string, transport *http.Transport, timeout time.Duration) *FreeIPA {
+	jar, _ := cookiejar.New(nil)
 	return &FreeIPA{
 		scheme: scheme,
 		host:   host,
 		client: &http.Client{
-			Timeout: timeout,
-			Jar:     jar,
+			Transport: transport,
+			Timeout:   timeout,
+			Jar:       jar, // куки фиксируются автоматически
 		},
 		apiVersion: apiVersion,
-	}, nil
+	}
 }
