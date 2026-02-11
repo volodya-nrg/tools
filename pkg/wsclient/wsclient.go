@@ -14,40 +14,42 @@ import (
 const handshakeTimeout = 10 * time.Second
 
 type WSClient struct {
-	ws     *websocket.Conn
-	wsResp *http.Response
+	conn *websocket.Conn
+	resp *http.Response
 }
 
 func (s *WSClient) Close() error {
-	var (
-		errs []error
-		err  error
-	)
+	var errs []error
 
-	if s.wsResp != nil {
-		if err = s.wsResp.Body.Close(); err != nil {
+	// подадим сигнал на мягкое закрытие
+	err := s.conn.WriteMessage(
+		websocket.CloseMessage,
+		websocket.FormatCloseMessage(websocket.CloseGoingAway, ""),
+	)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("failed to write close-message: %w", err))
+	}
+
+	// закроем response
+	if s.resp != nil {
+		if err = s.resp.Body.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("failed to close ws response body: %w", err))
 		}
 	}
 
-	// на всякий случай подадим сигнал на закрытие
-	msg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
-	if err = s.ws.WriteMessage(websocket.CloseMessage, msg); err != nil {
-		errs = append(errs, fmt.Errorf("failed to write close-message: %w", err))
-	}
-
-	if err = s.ws.Close(); err != nil {
+	// закроем базовое соединение (жестко)
+	if err = s.conn.Close(); err != nil {
 		errs = append(errs, fmt.Errorf("failed to close websocket connection: %w", err))
 	}
 
 	return errors.Join(errs...)
 }
 
-func (s *WSClient) GetWS() *websocket.Conn {
-	return s.ws
+func (s *WSClient) GetConn() *websocket.Conn {
+	return s.conn
 }
 
-func NewWSClient(ctx context.Context, serviceName, address string, tlsConfig *tls.Config) (*WSClient, error) {
+func NewWSClient(ctx context.Context, serviceName, addr string, tlsConfig *tls.Config) (*WSClient, error) {
 	wsHeaders := http.Header{}
 
 	if serviceName != "" {
@@ -59,13 +61,13 @@ func NewWSClient(ctx context.Context, serviceName, address string, tlsConfig *tl
 		HandshakeTimeout: handshakeTimeout,
 	}
 
-	wsConn, wsResp, err := d.DialContext(ctx, address, wsHeaders) //nolint:bodyclose
+	conn, resp, err := d.DialContext(ctx, addr, wsHeaders) //nolint:bodyclose
 	if err != nil {
-		return nil, fmt.Errorf("failed to dial (%s): %w", address, err)
+		return nil, fmt.Errorf("failed to dial (%s): %w", addr, err)
 	}
 
 	return &WSClient{
-		ws:     wsConn,
-		wsResp: wsResp,
+		conn: conn,
+		resp: resp,
 	}, nil
 }
