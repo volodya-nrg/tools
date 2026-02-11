@@ -11,6 +11,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const handshakeTimeout = 10 * time.Second
+
 type WSClient struct {
 	ws     *websocket.Conn
 	wsResp *http.Response
@@ -54,7 +56,7 @@ func NewWSClient(ctx context.Context, serviceName, address string, tlsConfig *tl
 
 	d := websocket.Dialer{
 		TLSClientConfig:  tlsConfig,
-		HandshakeTimeout: 10 * time.Second,
+		HandshakeTimeout: handshakeTimeout,
 	}
 
 	wsConn, wsResp, err := d.DialContext(ctx, address, wsHeaders) //nolint:bodyclose

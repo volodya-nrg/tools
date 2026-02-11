@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	defaultDelim = "⛔"
-	timeout      = 10 * time.Second
+	defaultDelim = "\n" // "⛔"
 	readTimeout  = 10 * time.Second
+	timeout      = 3 * time.Second
+	keepAlive    = 30 * time.Second
 )
 
 type Client struct {
@@ -103,7 +104,8 @@ func NewClient(addr string) (*Client, error) {
 	defer cancel()
 
 	dialer := &net.Dialer{
-		// Timeout: timeout,
+		Timeout:   timeout,
+		KeepAlive: keepAlive,
 	}
 
 	conn, err := dialer.DialContext(ctx, "tcp", addr)
