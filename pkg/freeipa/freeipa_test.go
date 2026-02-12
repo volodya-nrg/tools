@@ -14,13 +14,6 @@ import (
 	"github.com/volodya-nrg/tools/pkg/funcs"
 )
 
-type config struct {
-	Scheme   string `json:"scheme"`
-	Host     string `json:"host"`
-	Login    string `json:"login"`
-	Password string `json:"password"`
-}
-
 func TestFreeIPA(t *testing.T) { //nolint:tparallel
 	t.Parallel()
 
@@ -44,7 +37,9 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 
 	t.Run("check users", func(t *testing.T) { //nolint:paralleltest
 		// зайдем под админом
-		require.NoError(t, cl.Login(t.Context(), adminLogin, adminPass))
+		statusCode, err := cl.Login(t.Context(), adminLogin, adminPass)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 
 		newUserID := funcs.RandStr()
 
@@ -64,33 +59,50 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 			OU:                    funcs.Pointer(newUserID + "-ou"),
 			AddAttr:               []string{"o=MyCompany", "jpegphoto=path/to/photo.jpg"},
 		}
-		userExpected, err := cl.CreateUser(t.Context(), reqUser)
+		statusCode, userExpected, err := cl.CreateUser(t.Context(), reqUser)
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 
 		// получим пользователя
-		userActual, err := cl.GetUser(t.Context(), userExpected.UID)
+		statusCode, userActual, err := cl.GetUser(t.Context(), userExpected.UID)
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 		require.Equal(t, userExpected, userActual)
 
 		// получим дефолтный диапазон (20) пользователей
-		users, total, err := cl.GetUsers(t.Context(), -1, -1) // limit=default, offset=0
+		statusCode, users, total, err := cl.GetUsers(t.Context(), -1, -1) // limit=default, offset=0
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 		require.GreaterOrEqual(t, len(users), 2) // admin и новый пользователь
 		require.Len(t, users, int(total))
 
 		// выйдем из админа
-		require.NoError(t, cl.Logout(t.Context()))
+		statusCode, err = cl.Logout(t.Context())
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
+
+		// проверим еще раз
+		statusCode, err = cl.Logout(t.Context())
+		require.Error(t, err)
+		require.Equal(t, http.StatusUnauthorized, statusCode)
 
 		// проверим можно ли получить пользователя из под гостя
-		_, err = cl.GetUser(t.Context(), newUserID)
+		statusCode, _, err = cl.GetUser(t.Context(), newUserID)
 		require.Error(t, err)
+		require.Equal(t, http.StatusUnauthorized, statusCode)
 
 		// зайдем под новым пользователем, и выйдем
-		require.NoError(t, cl.Login(t.Context(), newUserID, password1))
-		require.NoError(t, cl.Logout(t.Context()))
+		statusCode, err = cl.Login(t.Context(), newUserID, password1)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
+		statusCode, err = cl.Logout(t.Context())
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 
 		// зайдем под админом, чтоб обновить все поля, т.к. у него привилегий больше
-		require.NoError(t, cl.Login(t.Context(), adminLogin, adminPass))
+		statusCode, err = cl.Login(t.Context(), adminLogin, adminPass)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 
 		// обновим пользователя
 		newPassExp := time.Now().AddDate(0, 3, 0)
@@ -103,11 +115,14 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 			KRBPasswordExpiration: funcs.Pointer(newPassExp),
 			NsAccountLock:         funcs.Pointer(true),
 		}
-		require.NoError(t, cl.UpdateUser(t.Context(), reqUser))
+		statusCode, err = cl.UpdateUser(t.Context(), reqUser)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 
 		// проверим измененные данные
-		userActual, err = cl.GetUser(t.Context(), newUserID)
+		statusCode, userActual, err = cl.GetUser(t.Context(), newUserID)
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 		require.Equal(t, reqUser.UID, userActual.UID)
 		require.Equal(t, reqUser.GivenName, userActual.GivenName)
 		require.Equal(t, reqUser.SN, userActual.SN)
@@ -117,27 +132,36 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 
 		// создадим роль и назначим ее пользователю
 		roleName := funcs.RandStr()
-		require.NoError(t, cl.CreateRole(t.Context(), roleName, nil))
-		require.NoError(t, cl.ToggleRoleForUser(t.Context(), roleName, newUserID))
+		statusCode, err = cl.CreateRole(t.Context(), roleName, nil)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
+		statusCode, err = cl.ToggleRoleForUser(t.Context(), roleName, newUserID)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 
 		// проверим что роль присутствует у пользователя
-		userActual, err = cl.GetUser(t.Context(), newUserID)
+		statusCode, userActual, err = cl.GetUser(t.Context(), newUserID)
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 		require.Contains(t, userActual.MemberOfRole, roleName)
 
 		// привяжем данную роль и к админу
-		require.NoError(t, cl.ToggleRoleForUser(t.Context(), roleName, adminLogin))
+		statusCode, err = cl.ToggleRoleForUser(t.Context(), roleName, adminLogin)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 
 		// запросим роль и проверим сколько у скольких человек она привязана, а так же кто привязан
-		roleActual, err := cl.GetRole(t.Context(), roleName)
+		statusCode, roleActual, err := cl.GetRole(t.Context(), roleName)
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 		require.Len(t, roleActual.MemberUser, 2)
 		require.Contains(t, roleActual.MemberUser, newUserID)
 		require.Contains(t, roleActual.MemberUser, adminLogin)
 
 		// запросим список ролей и посмотрим в нужной привязанных людей
-		roles, total, err := cl.GetRoles(t.Context(), -1, -1)
+		statusCode, roles, total, err := cl.GetRoles(t.Context(), -1, -1)
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 		require.Positive(t, total)
 		isHasNeedUsers := false
 		for _, v := range roles {
@@ -152,56 +176,76 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.True(t, isHasNeedUsers)
 
 		// удалим привязку роли от пользователя
-		require.NoError(t, cl.ToggleRoleForUser(t.Context(), roleName, newUserID))
+		statusCode, err = cl.ToggleRoleForUser(t.Context(), roleName, newUserID)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 
 		// проверим что у пользователя нет привязки к этой роли
-		userActual, err = cl.GetUser(t.Context(), newUserID)
+		statusCode, userActual, err = cl.GetUser(t.Context(), newUserID)
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 		require.NotContains(t, userActual.MemberOfRole, roleName)
 
 		// удалим роль и пользователя
-		require.NoError(t, cl.DeleteRole(t.Context(), roleName))
-		require.NoError(t, cl.DeleteUser(t.Context(), newUserID))
+		statusCode, err = cl.DeleteRole(t.Context(), roleName)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
+		statusCode, err = cl.DeleteUser(t.Context(), newUserID)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 
 		// проверим что пользователя нет
-		_, err = cl.GetUser(t.Context(), newUserID)
+		statusCode, _, err = cl.GetUser(t.Context(), newUserID)
 		require.Error(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 
 		// выйдем из админа
-		require.NoError(t, cl.Logout(t.Context()))
+		statusCode, err = cl.Logout(t.Context())
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 	})
 	t.Run("check roles", func(t *testing.T) { //nolint:paralleltest
-		require.NoError(t, cl.Login(t.Context(), adminLogin, adminPass))
+		statusCode, err := cl.Login(t.Context(), adminLogin, adminPass)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 
 		roleName := funcs.RandStr()
 		roleDesc := funcs.RandStr()
 
 		// создадим роль
-		require.NoError(t, cl.CreateRole(t.Context(), roleName, funcs.Pointer(roleDesc)))
+		statusCode, err = cl.CreateRole(t.Context(), roleName, funcs.Pointer(roleDesc))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 
 		// получим роль
-		role, err := cl.GetRole(t.Context(), roleName)
+		statusCode, role, err := cl.GetRole(t.Context(), roleName)
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 		require.Equal(t, roleName, role.CN)
 		require.Equal(t, roleDesc, role.Description)
 
 		// проверим явно что она есть
-		isHas, err := cl.HasRole(t.Context(), roleName)
+		statusCode, isHas, err := cl.HasRole(t.Context(), roleName)
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 		require.True(t, isHas)
 
 		// изменим роль
 		roleDesc2 := funcs.RandStr()
-		require.NoError(t, cl.UpdateRole(t.Context(), role.CN, roleDesc2))
+		statusCode, err = cl.UpdateRole(t.Context(), role.CN, roleDesc2)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 
 		// получим роль
-		role, err = cl.GetRole(t.Context(), role.CN)
+		statusCode, role, err = cl.GetRole(t.Context(), role.CN)
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 		require.Equal(t, roleDesc2, role.Description)
 
 		// проверим что данная роль появилась
-		roles, total, err := cl.GetRoles(t.Context(), -1, -1)
+		statusCode, roles, total, err := cl.GetRoles(t.Context(), -1, -1)
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 		require.GreaterOrEqual(t, total, uint32(1))
 		require.True(t, slices.ContainsFunc(roles, func(r Role) bool {
 			return r.CN == roleName
@@ -213,45 +257,56 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		}
 
 		// проверим список v1
-		roles, total, err = cl.GetRoles(t.Context(), 1, 0)
+		statusCode, roles, total, err = cl.GetRoles(t.Context(), 1, 0)
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 		require.GreaterOrEqual(t, total, uint32(1))
 		require.Len(t, roles, 1)
 
 		// проверим список v2, должно быть <= 20
-		roles, total, err = cl.GetRoles(t.Context(), math.MaxInt32, -1)
+		statusCode, roles, total, err = cl.GetRoles(t.Context(), math.MaxInt32, -1)
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 		require.GreaterOrEqual(t, total, uint32(1))
 		require.LessOrEqual(t, len(roles), limitDefault)
 
 		// проверим список v3
-		roles, total, err = cl.GetRoles(t.Context(), -1, math.MaxInt32)
+		statusCode, roles, total, err = cl.GetRoles(t.Context(), -1, math.MaxInt32)
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 		require.GreaterOrEqual(t, total, uint32(1))
 		require.LessOrEqual(t, len(roles), limitDefault)
 
 		// проверим список по именам
-		roles, err = cl.GetRolesByName(t.Context(), roleNames)
+		statusCode, roles, err = cl.GetRolesByName(t.Context(), roleNames)
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 		require.Len(t, roles, len(roleNames))
 
 		// получим по именам, но запросим левую роль, нужно чтоб response отработал корректно
-		_, err = cl.GetRolesByName(t.Context(), []string{funcs.RandStr()})
+		statusCode, _, err = cl.GetRolesByName(t.Context(), []string{funcs.RandStr()})
 		require.Error(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 
 		// удалим роль
-		require.NoError(t, cl.DeleteRole(t.Context(), roleName))
+		statusCode, err = cl.DeleteRole(t.Context(), roleName)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 
 		// получим роль
-		_, err = cl.GetRole(t.Context(), roleName)
+		statusCode, _, err = cl.GetRole(t.Context(), roleName)
 		require.Error(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 
 		// проверим через другой метод
-		isHas, err = cl.HasRole(t.Context(), roleName)
+		statusCode, isHas, err = cl.HasRole(t.Context(), roleName)
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 		require.False(t, isHas)
 
 		// выйдем из под админа
-		require.NoError(t, cl.Logout(t.Context()))
+		statusCode, err = cl.Logout(t.Context())
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
 	})
 }

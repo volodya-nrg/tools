@@ -2,6 +2,13 @@ package freeipa
 
 import "time"
 
+type config struct {
+	Scheme   string `json:"scheme"`
+	Host     string `json:"host"`
+	Login    string `json:"login"`
+	Password string `json:"password"`
+}
+
 type responseBasic struct {
 	Result    *responseResult `json:"result"`
 	Error     *responseError  `json:"error"`

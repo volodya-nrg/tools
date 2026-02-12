@@ -71,3 +71,13 @@ func NewWSClient(ctx context.Context, serviceName, addr string, tlsConfig *tls.C
 		resp: resp,
 	}, nil
 }
+
+/*
+more example:
+
+conn, respWS, err := websocket.DefaultDialer.DialContext(
+	ctx,
+	fmt.Sprintf("ws://%s/ws", addr),
+	http.Header{},
+)
+*/

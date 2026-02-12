@@ -47,6 +47,7 @@ const (
 	keyOptMemberUser            = "member_user"
 )
 
+// FreeIPA клиент для общения с сервером IPA. Ошибки все таки надо различать: внутренние и ошибки от response-а.
 type FreeIPA struct {
 	scheme     string
 	host       string
@@ -60,7 +61,7 @@ func (f *FreeIPA) Close() error {
 }
 
 // Login специальный/отдельный запрос на аутентификацию (не jsonRPC)
-func (f *FreeIPA) Login(ctx context.Context, userID, password string) error {
+func (f *FreeIPA) Login(ctx context.Context, userID, password string) (int, error) {
 	values := url.Values{
 		"user":     []string{userID},
 		"password": []string{password},
@@ -74,18 +75,19 @@ func (f *FreeIPA) Login(ctx context.Context, userID, password string) error {
 		"Referer": fmt.Sprintf("%s://%s/ipa", f.scheme, f.host),
 	}
 
-	statusCode, _, err := f.httpRequest(ctx, f.client, http.MethodPost, u, []byte(values.Encode()), headers)
+	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, []byte(values.Encode()), headers)
 	if err != nil {
-		return fmt.Errorf("failed to http-request: %w", err)
-	}
-	if err = f.checkStatusCode(statusCode); err != nil {
-		return err
+		return 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %w", err)
 	}
 
-	return nil
+	if _, err = f.handleResponse(statusCode, bodyBytes); err != nil {
+		return statusCode, err
+	}
+
+	return statusCode, nil
 }
 
-func (f *FreeIPA) Logout(ctx context.Context) error {
+func (f *FreeIPA) Logout(ctx context.Context) (int, error) {
 	u := url.URL{
 		Scheme: f.scheme,
 		Host:   f.host,
@@ -94,32 +96,24 @@ func (f *FreeIPA) Logout(ctx context.Context) error {
 
 	req, err := f.rpcReq("session_logout", "", nil, true)
 	if err != nil {
-		return fmt.Errorf("failed to create jsonrpc-request: %w", err)
+		return 0, fmt.Errorf(errMsgFailedToCreateJSONRPCRequest+": %w", err)
 	}
-
-	resp := responseBasic{}
 
 	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
 	if err != nil {
-		return fmt.Errorf("failed to http-request: %w", err)
+		return 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %w", err)
 	}
-	if err = f.checkStatusCode(statusCode); err != nil {
-		return err
-	}
-	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
-		return fmt.Errorf("failed to unmarshal json-response: %w", err)
-	}
-	if resp.Error != nil {
-		return fmt.Errorf("failed to logout: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+	if _, err = f.handleResponse(statusCode, bodyBytes); err != nil {
+		return statusCode, err
 	}
 
-	return nil
+	return statusCode, nil
 }
 
 // users
 
 // GetUsers получение пользователей
-func (f *FreeIPA) GetUsers(ctx context.Context, limit, offset int32) ([]User, uint32, error) {
+func (f *FreeIPA) GetUsers(ctx context.Context, limit, offset int32) (int, []User, uint32, error) {
 	u := url.URL{
 		Scheme: f.scheme,
 		Host:   f.host,
@@ -131,26 +125,20 @@ func (f *FreeIPA) GetUsers(ctx context.Context, limit, offset int32) ([]User, ui
 
 	req, err := f.rpcReq("user_find", "", opts, true)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to create jsonrpc-request (user_find): %w", err)
+		return 0, nil, 0, fmt.Errorf(errMsgFailedToCreateJSONRPCRequest+" (user_find): %w", err)
 	}
-
-	resp := responseBasic{}
 
 	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to http-request: %w", err)
+		return 0, nil, 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %w", err)
 	}
-	if err = f.checkStatusCode(statusCode); err != nil {
-		return nil, 0, err
-	}
-	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
-		return nil, 0, fmt.Errorf("failed to unmarshal json-response: %w", err)
-	}
-	if resp.Error != nil {
-		return nil, 0, fmt.Errorf("failed to get users (pkey_only): code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+
+	resp, err := f.handleResponse(statusCode, bodyBytes)
+	if err != nil {
+		return statusCode, nil, 0, err
 	}
 	if resp.Result == nil {
-		return nil, 0, errors.New("response result is nil")
+		return statusCode, nil, 0, errors.New(errMsgResponseResultIsNil)
 	}
 
 	users := make([]User, 0)
@@ -175,7 +163,7 @@ func (f *FreeIPA) GetUsers(ctx context.Context, limit, offset int32) ([]User, ui
 	for i, user := range targetUsers {
 		method, err := f.rpcReq("user_show", fmt.Sprintf(`["%s"]`, user.UID), opts, false)
 		if err != nil {
-			return nil, 0, fmt.Errorf("failed to create jsonrpc-request (user_show): %w", err)
+			return 0, nil, 0, fmt.Errorf(errMsgFailedToCreateJSONRPCRequest+" (user_show): %w", err)
 		}
 
 		methods[i] = string(method)
@@ -183,26 +171,20 @@ func (f *FreeIPA) GetUsers(ctx context.Context, limit, offset int32) ([]User, ui
 
 	req, err = f.rpcReq("batch", fmt.Sprintf(`[%s]`, strings.Join(methods, ",")), nil, true)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to create jsonrpc-request (batch): %w", err)
+		return 0, nil, 0, fmt.Errorf(errMsgFailedToCreateJSONRPCRequest+" (batch): %w", err)
 	}
-
-	resp = responseBasic{}
 
 	statusCode, bodyBytes, err = f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to http-request: %w", err)
+		return 0, nil, 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %w", err)
 	}
-	if err = f.checkStatusCode(statusCode); err != nil {
-		return nil, 0, err
-	}
-	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
-		return nil, 0, fmt.Errorf("failed to unmarshal json-response: %w", err)
-	}
-	if resp.Error != nil {
-		return nil, 0, fmt.Errorf("failed to get users: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+
+	resp, err = f.handleResponse(statusCode, bodyBytes)
+	if err != nil {
+		return statusCode, nil, 0, err
 	}
 	if resp.Result == nil {
-		return nil, 0, errors.New("response result is nil")
+		return statusCode, nil, 0, errors.New(errMsgResponseResultIsNil)
 	}
 
 	users = make([]User, 0, len(resp.Result.Results))
@@ -213,10 +195,10 @@ func (f *FreeIPA) GetUsers(ctx context.Context, limit, offset int32) ([]User, ui
 		}
 	}
 
-	return users, total, nil
+	return statusCode, users, total, nil
 }
 
-func (f *FreeIPA) GetUser(ctx context.Context, userID string) (*User, error) {
+func (f *FreeIPA) GetUser(ctx context.Context, userID string) (int, *User, error) {
 	u := url.URL{
 		Scheme: f.scheme,
 		Host:   f.host,
@@ -228,39 +210,33 @@ func (f *FreeIPA) GetUser(ctx context.Context, userID string) (*User, error) {
 
 	req, err := f.rpcReq("user_show", fmt.Sprintf(`["%s"]`, userID), opts, true)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create jsonrpc-request: %w", err)
+		return 0, nil, fmt.Errorf(errMsgFailedToCreateJSONRPCRequest+": %w", err)
 	}
-
-	resp := responseBasic{}
 
 	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
 	if err != nil {
-		return nil, fmt.Errorf("failed to http-request: %w", err)
+		return 0, nil, fmt.Errorf(errMsgFailedToHTTPRequest+": %w", err)
 	}
-	if err = f.checkStatusCode(statusCode); err != nil {
-		return nil, err
-	}
-	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal json-response: %w", err)
-	}
-	if resp.Error != nil {
-		return nil, fmt.Errorf("failed to get item: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+
+	resp, err := f.handleResponse(statusCode, bodyBytes)
+	if err != nil {
+		return statusCode, nil, err
 	}
 	if resp.Result == nil {
-		return nil, errors.New("response result is nil")
+		return statusCode, nil, errors.New(errMsgResponseResultIsNil)
 	}
 
 	userTmp, ok := resp.Result.Result.(map[string]any)
 	if !ok {
-		return nil, errors.New("failed to parse response")
+		return statusCode, nil, errors.New(errMsgFailedToParseResponse)
 	}
 
 	user := mapUserToDTOUser(userTmp)
 
-	return &user, nil
+	return statusCode, &user, nil
 }
 
-func (f *FreeIPA) CreateUser(ctx context.Context, reqUser RequestUser) (*User, error) {
+func (f *FreeIPA) CreateUser(ctx context.Context, reqUser RequestUser) (int, *User, error) {
 	u := url.URL{
 		Scheme: f.scheme,
 		Host:   f.host,
@@ -306,40 +282,34 @@ func (f *FreeIPA) CreateUser(ctx context.Context, reqUser RequestUser) (*User, e
 
 	req, err := f.rpcReq("user_add", fmt.Sprintf(`["%s"]`, reqUser.UID), opts, true)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create jsonrpc-request: %w", err)
+		return 0, nil, fmt.Errorf(errMsgFailedToCreateJSONRPCRequest+": %w", err)
 	}
-
-	resp := responseBasic{}
 
 	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
 	if err != nil {
-		return nil, fmt.Errorf("failed to http-request: %w", err)
+		return 0, nil, fmt.Errorf(errMsgFailedToHTTPRequest+": %w", err)
 	}
-	if err = f.checkStatusCode(statusCode); err != nil {
-		return nil, err
-	}
-	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal json-response: %w", err)
-	}
-	if resp.Error != nil {
-		return nil, fmt.Errorf("failed to create item: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+
+	resp, err := f.handleResponse(statusCode, bodyBytes)
+	if err != nil {
+		return statusCode, nil, err
 	}
 	if resp.Result == nil {
-		return nil, errors.New("response result is nil")
+		return statusCode, nil, errors.New(errMsgResponseResultIsNil)
 	}
 
 	userTmp, ok := resp.Result.Result.(map[string]any)
 	if !ok {
-		return nil, errors.New("failed to parse response")
+		return statusCode, nil, errors.New(errMsgFailedToParseResponse)
 	}
 
 	user := mapUserToDTOUser(userTmp)
 
-	return &user, nil
+	return statusCode, &user, nil
 }
 
 // UpdateUser тут лучше пользователя обратно не отдавать, т.к. он имеет не полные данные
-func (f *FreeIPA) UpdateUser(ctx context.Context, reqUser RequestUser) error {
+func (f *FreeIPA) UpdateUser(ctx context.Context, reqUser RequestUser) (int, error) {
 	u := url.URL{
 		Scheme: f.scheme,
 		Host:   f.host,
@@ -368,29 +338,22 @@ func (f *FreeIPA) UpdateUser(ctx context.Context, reqUser RequestUser) error {
 
 	req, err := f.rpcReq("user_mod", fmt.Sprintf(`["%s"]`, reqUser.UID), opts, true)
 	if err != nil {
-		return fmt.Errorf("failed to create jsonrpc-request: %w", err)
+		return 0, fmt.Errorf(errMsgFailedToCreateJSONRPCRequest+": %w", err)
 	}
-
-	resp := responseBasic{}
 
 	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
 	if err != nil {
-		return fmt.Errorf("failed to http-request: %w", err)
-	}
-	if err = f.checkStatusCode(statusCode); err != nil {
-		return err
-	}
-	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
-		return fmt.Errorf("failed to unmarshal json-response: %w", err)
-	}
-	if resp.Error != nil {
-		return fmt.Errorf("failed to update item: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+		return 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %w", err)
 	}
 
-	return nil
+	if _, err = f.handleResponse(statusCode, bodyBytes); err != nil {
+		return statusCode, err
+	}
+
+	return statusCode, nil
 }
 
-func (f *FreeIPA) DeleteUser(ctx context.Context, userID string) error {
+func (f *FreeIPA) DeleteUser(ctx context.Context, userID string) (int, error) {
 	u := url.URL{
 		Scheme: f.scheme,
 		Host:   f.host,
@@ -399,35 +362,28 @@ func (f *FreeIPA) DeleteUser(ctx context.Context, userID string) error {
 
 	req, err := f.rpcReq("user_del", fmt.Sprintf(`["%s"]`, userID), nil, true)
 	if err != nil {
-		return fmt.Errorf("failed to create jsonrpc-request: %w", err)
+		return 0, fmt.Errorf(errMsgFailedToCreateJSONRPCRequest+": %w", err)
 	}
-
-	resp := responseBasic{}
 
 	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
 	if err != nil {
-		return fmt.Errorf("failed to http-request: %w", err)
-	}
-	if err = f.checkStatusCode(statusCode); err != nil {
-		return err
-	}
-	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
-		return fmt.Errorf("failed to unmarshal json-response: %w", err)
-	}
-	if resp.Error != nil {
-		return fmt.Errorf("failed to delete item: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+		return 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %w", err)
 	}
 
-	return nil
+	if _, err = f.handleResponse(statusCode, bodyBytes); err != nil {
+		return statusCode, err
+	}
+
+	return statusCode, nil
 }
 
 // roles
 
 // GetRoles получение ролей с фиксированным лимитом
-func (f *FreeIPA) GetRoles(ctx context.Context, limit, offset int32) ([]Role, uint32, error) {
-	roles, total, err := f.getAllRoles(ctx)
+func (f *FreeIPA) GetRoles(ctx context.Context, limit, offset int32) (int, []Role, uint32, error) {
+	statusCode, roles, total, err := f.getAllRoles(ctx)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get all roles: %w", err)
+		return statusCode, nil, 0, fmt.Errorf("failed to get all roles: %w", err)
 	}
 
 	roles = getRangeFromSlice(roles, limit, offset, limitDefault)
@@ -437,20 +393,20 @@ func (f *FreeIPA) GetRoles(ctx context.Context, limit, offset int32) ([]Role, ui
 		names[i] = v.CN
 	}
 
-	roles, err = f.getAllRolesByName(ctx, names)
+	statusCode, roles, err = f.getAllRolesByName(ctx, names)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get all roles by name: %w", err)
+		return statusCode, nil, 0, fmt.Errorf("failed to get all roles by name: %w", err)
 	}
 
-	return roles, total, nil
+	return statusCode, roles, total, nil
 }
 
 // GetRolesByName получение ролей по имени, если есть отсутствующая роль, то будет ошибка
-func (f *FreeIPA) GetRolesByName(ctx context.Context, names []string) ([]Role, error) {
+func (f *FreeIPA) GetRolesByName(ctx context.Context, names []string) (int, []Role, error) {
 	return f.getAllRolesByName(ctx, names)
 }
 
-func (f *FreeIPA) GetRole(ctx context.Context, name string) (*Role, error) {
+func (f *FreeIPA) GetRole(ctx context.Context, name string) (int, *Role, error) {
 	u := url.URL{
 		Scheme: f.scheme,
 		Host:   f.host,
@@ -462,50 +418,44 @@ func (f *FreeIPA) GetRole(ctx context.Context, name string) (*Role, error) {
 
 	req, err := f.rpcReq("role_show", fmt.Sprintf(`["%s"]`, name), opts, true)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create jsonrpc-request: %w", err)
+		return 0, nil, fmt.Errorf(errMsgFailedToCreateJSONRPCRequest+": %w", err)
 	}
-
-	resp := responseBasic{}
 
 	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
 	if err != nil {
-		return nil, fmt.Errorf("failed to http-request: %w", err)
+		return 0, nil, fmt.Errorf(errMsgFailedToHTTPRequest+": %w", err)
 	}
-	if err = f.checkStatusCode(statusCode); err != nil {
-		return nil, err
-	}
-	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal json-response: %w", err)
-	}
-	if resp.Error != nil {
-		return nil, fmt.Errorf("failed to get item: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+
+	resp, err := f.handleResponse(statusCode, bodyBytes)
+	if err != nil {
+		return statusCode, nil, err
 	}
 	if resp.Result == nil {
-		return nil, errors.New("response result is nil")
+		return statusCode, nil, errors.New(errMsgResponseResultIsNil)
 	}
 
 	roleTmp, ok := resp.Result.Result.(map[string]any)
 	if !ok {
-		return nil, errors.New("failed to parse response")
+		return statusCode, nil, errors.New(errMsgFailedToParseResponse)
 	}
 
 	role := mapUserToDTORole(roleTmp)
 
-	return &role, nil
+	return statusCode, &role, nil
 }
 
-func (f *FreeIPA) HasRole(ctx context.Context, name string) (bool, error) {
-	roles, _, err := f.getAllRoles(ctx)
+func (f *FreeIPA) HasRole(ctx context.Context, name string) (int, bool, error) {
+	statusCode, roles, _, err := f.getAllRoles(ctx)
 	if err != nil {
-		return false, fmt.Errorf("failed to get all roles: %w", err)
+		return statusCode, false, fmt.Errorf("failed to get all roles: %w", err)
 	}
 
-	return slices.ContainsFunc(roles, func(role Role) bool {
+	return statusCode, slices.ContainsFunc(roles, func(role Role) bool {
 		return role.CN == name
 	}), nil
 }
 
-func (f *FreeIPA) CreateRole(ctx context.Context, name string, desc *string) error {
+func (f *FreeIPA) CreateRole(ctx context.Context, name string, desc *string) (int, error) {
 	u := url.URL{
 		Scheme: f.scheme,
 		Host:   f.host,
@@ -519,29 +469,22 @@ func (f *FreeIPA) CreateRole(ctx context.Context, name string, desc *string) err
 
 	req, err := f.rpcReq("role_add", fmt.Sprintf(`["%s"]`, name), opts, true)
 	if err != nil {
-		return fmt.Errorf("failed to create jsonrpc-request: %w", err)
+		return 0, fmt.Errorf(errMsgFailedToCreateJSONRPCRequest+": %w", err)
 	}
-
-	resp := responseBasic{}
 
 	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
 	if err != nil {
-		return fmt.Errorf("failed to http-request: %w", err)
-	}
-	if err = f.checkStatusCode(statusCode); err != nil {
-		return err
-	}
-	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
-		return fmt.Errorf("failed to unmarshal json-response: %w", err)
-	}
-	if resp.Error != nil {
-		return fmt.Errorf("failed to create item: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+		return 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %w", err)
 	}
 
-	return nil
+	if _, err = f.handleResponse(statusCode, bodyBytes); err != nil {
+		return statusCode, err
+	}
+
+	return statusCode, nil
 }
 
-func (f *FreeIPA) UpdateRole(ctx context.Context, name, desc string) error {
+func (f *FreeIPA) UpdateRole(ctx context.Context, name, desc string) (int, error) {
 	u := url.URL{
 		Scheme: f.scheme,
 		Host:   f.host,
@@ -553,29 +496,22 @@ func (f *FreeIPA) UpdateRole(ctx context.Context, name, desc string) error {
 
 	req, err := f.rpcReq("role_mod", fmt.Sprintf(`["%s"]`, name), opts, true)
 	if err != nil {
-		return fmt.Errorf("failed to create jsonrpc-request: %w", err)
+		return 0, fmt.Errorf(errMsgFailedToCreateJSONRPCRequest+": %w", err)
 	}
-
-	resp := responseBasic{}
 
 	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
 	if err != nil {
-		return fmt.Errorf("failed to http-request: %w", err)
-	}
-	if err = f.checkStatusCode(statusCode); err != nil {
-		return err
-	}
-	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
-		return fmt.Errorf("failed to unmarshal json-response: %w", err)
-	}
-	if resp.Error != nil {
-		return fmt.Errorf("failed to update item: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+		return 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %w", err)
 	}
 
-	return nil
+	if _, err = f.handleResponse(statusCode, bodyBytes); err != nil {
+		return statusCode, err
+	}
+
+	return statusCode, nil
 }
 
-func (f *FreeIPA) DeleteRole(ctx context.Context, name string) error {
+func (f *FreeIPA) DeleteRole(ctx context.Context, name string) (int, error) {
 	u := url.URL{
 		Scheme: f.scheme,
 		Host:   f.host,
@@ -584,42 +520,31 @@ func (f *FreeIPA) DeleteRole(ctx context.Context, name string) error {
 
 	req, err := f.rpcReq("role_del", fmt.Sprintf(`["%s"]`, name), nil, true)
 	if err != nil {
-		return fmt.Errorf("failed to create jsonrpc-request: %w", err)
+		return 0, fmt.Errorf(errMsgFailedToCreateJSONRPCRequest+": %w", err)
 	}
-
-	resp := responseBasic{}
 
 	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
 	if err != nil {
-		return fmt.Errorf("failed to http-request: %w", err)
-	}
-	if err = f.checkStatusCode(statusCode); err != nil {
-		return err
-	}
-	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
-		return fmt.Errorf("failed to unmarshal json-response: %w", err)
-	}
-	if resp.Error != nil {
-		return fmt.Errorf("failed to delete item: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+		return 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %w", err)
 	}
 
-	return nil
+	if _, err = f.handleResponse(statusCode, bodyBytes); err != nil {
+		return statusCode, err
+	}
+
+	return statusCode, nil
 }
 
-func (f *FreeIPA) ToggleRoleForUser(ctx context.Context, roleName, userID string) error {
-	user, err := f.GetUser(ctx, userID)
+func (f *FreeIPA) ToggleRoleForUser(ctx context.Context, roleName, userID string) (int, error) {
+	statusCode, user, err := f.GetUser(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("failed to get user: %w", err)
+		return statusCode, fmt.Errorf("failed to get user: %w", err)
 	}
 
-	if slices.Contains(user.MemberOfRole, roleName) {
-		return f.editRoleForUser(ctx, roleName, userID, true)
-	} else {
-		return f.editRoleForUser(ctx, roleName, userID, false)
-	}
+	return f.editRoleForUser(ctx, roleName, userID, slices.Contains(user.MemberOfRole, roleName))
 }
 
-func (f *FreeIPA) editRoleForUser(ctx context.Context, roleName, userID string, isRemove bool) error {
+func (f *FreeIPA) editRoleForUser(ctx context.Context, roleName, userID string, isRemove bool) (int, error) {
 	method := "role_add_member"
 
 	if isRemove {
@@ -637,29 +562,22 @@ func (f *FreeIPA) editRoleForUser(ctx context.Context, roleName, userID string, 
 
 	req, err := f.rpcReq(method, fmt.Sprintf(`["%s"]`, roleName), opts, true)
 	if err != nil {
-		return fmt.Errorf("failed to create jsonrpc-request: %w", err)
+		return 0, fmt.Errorf(errMsgFailedToCreateJSONRPCRequest+": %w", err)
 	}
-
-	resp := responseBasic{}
 
 	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
 	if err != nil {
-		return fmt.Errorf("failed to http-request: %w", err)
-	}
-	if err = f.checkStatusCode(statusCode); err != nil {
-		return err
-	}
-	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
-		return fmt.Errorf("failed to unmarshal json-response: %w", err)
-	}
-	if resp.Error != nil {
-		return fmt.Errorf("failed to add role to user: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+		return 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %w", err)
 	}
 
-	return nil
+	if _, err = f.handleResponse(statusCode, bodyBytes); err != nil {
+		return statusCode, err
+	}
+
+	return statusCode, nil
 }
 
-func (f *FreeIPA) getAllRoles(ctx context.Context) ([]Role, uint32, error) {
+func (f *FreeIPA) getAllRoles(ctx context.Context) (int, []Role, uint32, error) {
 	u := url.URL{
 		Scheme: f.scheme,
 		Host:   f.host,
@@ -671,31 +589,25 @@ func (f *FreeIPA) getAllRoles(ctx context.Context) ([]Role, uint32, error) {
 
 	req, err := f.rpcReq("role_find", "", opts, true)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to create jsonrpc-request: %w", err)
+		return 0, nil, 0, fmt.Errorf(errMsgFailedToCreateJSONRPCRequest+": %w", err)
 	}
-
-	resp := responseBasic{}
 
 	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to http-request: %w", err)
+		return 0, nil, 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %w", err)
 	}
-	if err = f.checkStatusCode(statusCode); err != nil {
-		return nil, 0, err
-	}
-	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
-		return nil, 0, fmt.Errorf("failed to unmarshal json-response: %w", err)
-	}
-	if resp.Error != nil {
-		return nil, 0, fmt.Errorf("failed to get roles: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+
+	resp, err := f.handleResponse(statusCode, bodyBytes)
+	if err != nil {
+		return statusCode, nil, 0, err
 	}
 	if resp.Result == nil {
-		return nil, 0, errors.New("response result is nil")
+		return statusCode, nil, 0, errors.New(errMsgResponseResultIsNil)
 	}
 
 	rolesTmp, ok := resp.Result.Result.([]any)
 	if !ok {
-		return nil, 0, errors.New("failed to parse roles response")
+		return statusCode, nil, 0, errors.New("failed to parse roles response")
 	}
 
 	roles := make([]Role, 0, len(rolesTmp))
@@ -704,16 +616,16 @@ func (f *FreeIPA) getAllRoles(ctx context.Context) ([]Role, uint32, error) {
 	for _, v := range rolesTmp {
 		v2, ok := v.(map[string]any)
 		if !ok {
-			return nil, 0, errors.New("failed to parse role response")
+			return statusCode, nil, 0, errors.New("failed to parse role response")
 		}
 
 		roles = append(roles, mapUserToDTORole(v2))
 	}
 
-	return roles, total, nil
+	return statusCode, roles, total, nil
 }
 
-func (f *FreeIPA) getAllRolesByName(ctx context.Context, names []string) ([]Role, error) {
+func (f *FreeIPA) getAllRolesByName(ctx context.Context, names []string) (int, []Role, error) {
 	methods := make([]string, len(names))
 	u := url.URL{
 		Scheme: f.scheme,
@@ -728,7 +640,7 @@ func (f *FreeIPA) getAllRolesByName(ctx context.Context, names []string) ([]Role
 	for i, name := range names {
 		method, err := f.rpcReq("role_show", fmt.Sprintf(`["%s"]`, name), opts, false)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create jsonrpc-request (role_show): %w", err)
+			return 0, nil, fmt.Errorf(errMsgFailedToCreateJSONRPCRequest+" (role_show): %w", err)
 		}
 
 		methods[i] = string(method)
@@ -736,26 +648,20 @@ func (f *FreeIPA) getAllRolesByName(ctx context.Context, names []string) ([]Role
 
 	req, err := f.rpcReq("batch", fmt.Sprintf(`[%s]`, strings.Join(methods, ",")), nil, true)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create jsonrpc-request (batch): %w", err)
+		return 0, nil, fmt.Errorf(errMsgFailedToCreateJSONRPCRequest+" (batch): %w", err)
 	}
-
-	resp := responseBasic{}
 
 	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
 	if err != nil {
-		return nil, fmt.Errorf("failed to http-request: %w", err)
+		return 0, nil, fmt.Errorf(errMsgFailedToHTTPRequest+": %w", err)
 	}
-	if err = f.checkStatusCode(statusCode); err != nil {
-		return nil, err
-	}
-	if err = json.Unmarshal(bodyBytes, &resp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal json-response: %w", err)
-	}
-	if resp.Error != nil {
-		return nil, fmt.Errorf("failed to get roles: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+
+	resp, err := f.handleResponse(statusCode, bodyBytes)
+	if err != nil {
+		return statusCode, nil, err
 	}
 	if resp.Result == nil {
-		return nil, errors.New("response result is nil")
+		return statusCode, nil, errors.New(errMsgResponseResultIsNil)
 	}
 
 	var errs []error
@@ -765,7 +671,7 @@ func (f *FreeIPA) getAllRolesByName(ctx context.Context, names []string) ([]Role
 		}
 	}
 	if len(errs) > 0 {
-		return nil, errors.Join(errs...)
+		return statusCode, nil, errors.Join(errs...)
 	}
 
 	roles := make([]Role, 0, len(resp.Result.Results))
@@ -776,7 +682,7 @@ func (f *FreeIPA) getAllRolesByName(ctx context.Context, names []string) ([]Role
 		}
 	}
 
-	return roles, nil
+	return statusCode, roles, nil
 }
 
 func (f *FreeIPA) headers() map[string]string {
@@ -830,11 +736,25 @@ func (f *FreeIPA) httpRequest(
 	return funcs.HTTPRequest(ctx, client, method, u, body, headers)
 }
 
-func (f *FreeIPA) checkStatusCode(statusCode int) error {
+func (f *FreeIPA) handleResponse( //nolint:nonamedreturns
+	statusCode int,
+	bodyBytes []byte,
+) (resp responseBasic, err error) {
 	if statusCode >= http.StatusBadRequest {
-		return fmt.Errorf("status code is %d", statusCode)
+		err = errors.New("unknown error")
 	}
-	return nil
+
+	// если есть какие-то (html, json или др.) байты, то обработаем их
+	if len(bodyBytes) > 0 {
+		// если успешно пропарсились данные, то выудим ошибку
+		if unmarshalErr := json.Unmarshal(bodyBytes, &resp); unmarshalErr == nil {
+			if resp.Error != nil {
+				err = fmt.Errorf("response has error: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+			}
+		}
+	}
+
+	return
 }
 
 func NewFreeIPA(scheme, host string, transport *http.Transport, timeout time.Duration) *FreeIPA {
