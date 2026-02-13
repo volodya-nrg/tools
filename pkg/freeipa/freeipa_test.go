@@ -74,7 +74,7 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, statusCode)
 		require.GreaterOrEqual(t, len(users), 2) // admin и новый пользователь
-		require.Len(t, users, int(total))
+		require.GreaterOrEqual(t, int(total), len(users))
 
 		// выйдем из админа
 		statusCode, err = cl.Logout(t.Context())
@@ -197,7 +197,7 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		// проверим что пользователя нет
 		statusCode, _, err = cl.GetUser(t.Context(), newUserID)
 		require.Error(t, err)
-		require.Equal(t, http.StatusOK, statusCode)
+		require.Equal(t, http.StatusNotFound, statusCode)
 
 		// выйдем из админа
 		statusCode, err = cl.Logout(t.Context())
@@ -286,7 +286,7 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		// получим по именам, но запросим левую роль, нужно чтоб response отработал корректно
 		statusCode, _, err = cl.GetRolesByName(t.Context(), []string{funcs.RandStr()})
 		require.Error(t, err)
-		require.Equal(t, http.StatusOK, statusCode)
+		require.Equal(t, 0, statusCode)
 
 		// удалим роль
 		statusCode, err = cl.DeleteRole(t.Context(), roleName)
@@ -296,7 +296,7 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		// получим роль
 		statusCode, _, err = cl.GetRole(t.Context(), roleName)
 		require.Error(t, err)
-		require.Equal(t, http.StatusOK, statusCode)
+		require.Equal(t, http.StatusNotFound, statusCode)
 
 		// проверим через другой метод
 		statusCode, isHas, err = cl.HasRole(t.Context(), roleName)

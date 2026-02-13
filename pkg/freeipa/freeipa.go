@@ -80,11 +80,12 @@ func (f *FreeIPA) Login(ctx context.Context, userID, password string) (int, erro
 		return 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %s", err)
 	}
 
-	if _, err = f.handleResponse(statusCode, bodyBytes); err != nil {
-		return statusCode, err
+	newStatusCode, _, err := f.handleResponse(statusCode, bodyBytes)
+	if err != nil {
+		return newStatusCode, err
 	}
 
-	return statusCode, nil
+	return newStatusCode, nil
 }
 
 func (f *FreeIPA) Logout(ctx context.Context) (int, error) {
@@ -104,11 +105,12 @@ func (f *FreeIPA) Logout(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %s", err)
 	}
 
-	if _, err = f.handleResponse(statusCode, bodyBytes); err != nil {
-		return statusCode, err
+	newStatusCode, _, err := f.handleResponse(statusCode, bodyBytes)
+	if err != nil {
+		return newStatusCode, err
 	}
 
-	return statusCode, nil
+	return newStatusCode, nil
 }
 
 // users
@@ -134,12 +136,12 @@ func (f *FreeIPA) GetUsers(ctx context.Context, limit, offset int32) (int, []Use
 		return 0, nil, 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %s", err)
 	}
 
-	resp, err := f.handleResponse(statusCode, bodyBytes)
+	newStatusCode, resp, err := f.handleResponse(statusCode, bodyBytes)
 	if err != nil {
-		return statusCode, nil, 0, err
+		return newStatusCode, nil, 0, err
 	}
 	if resp.Result == nil {
-		return statusCode, nil, 0, errors.New(errMsgResponseResultIsNil)
+		return 0, nil, 0, errors.New(errMsgResponseResultIsNil)
 	}
 
 	users := make([]User, 0)
@@ -180,12 +182,12 @@ func (f *FreeIPA) GetUsers(ctx context.Context, limit, offset int32) (int, []Use
 		return 0, nil, 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %s", err)
 	}
 
-	resp, err = f.handleResponse(statusCode, bodyBytes)
+	newStatusCode, resp, err = f.handleResponse(statusCode, bodyBytes)
 	if err != nil {
-		return statusCode, nil, 0, err
+		return newStatusCode, nil, 0, err
 	}
 	if resp.Result == nil {
-		return statusCode, nil, 0, errors.New(errMsgResponseResultIsNil)
+		return 0, nil, 0, errors.New(errMsgResponseResultIsNil)
 	}
 
 	users = make([]User, 0, len(resp.Result.Results))
@@ -196,7 +198,7 @@ func (f *FreeIPA) GetUsers(ctx context.Context, limit, offset int32) (int, []Use
 		}
 	}
 
-	return statusCode, users, total, nil
+	return newStatusCode, users, total, nil
 }
 
 func (f *FreeIPA) GetUser(ctx context.Context, userID string) (int, *User, error) {
@@ -219,22 +221,22 @@ func (f *FreeIPA) GetUser(ctx context.Context, userID string) (int, *User, error
 		return 0, nil, fmt.Errorf(errMsgFailedToHTTPRequest+": %s", err)
 	}
 
-	resp, err := f.handleResponse(statusCode, bodyBytes)
+	newStatusCode, resp, err := f.handleResponse(statusCode, bodyBytes)
 	if err != nil {
-		return statusCode, nil, err
+		return newStatusCode, nil, err
 	}
 	if resp.Result == nil {
-		return statusCode, nil, errors.New(errMsgResponseResultIsNil)
+		return 0, nil, errors.New(errMsgResponseResultIsNil)
 	}
 
 	userTmp, ok := resp.Result.Result.(map[string]any)
 	if !ok {
-		return statusCode, nil, errors.New(errMsgFailedToParseResponse)
+		return 0, nil, errors.New(errMsgFailedToParseResponse)
 	}
 
 	user := mapUserToDTOUser(userTmp)
 
-	return statusCode, &user, nil
+	return newStatusCode, &user, nil
 }
 
 func (f *FreeIPA) CreateUser(ctx context.Context, reqUser RequestUser) (int, *User, error) {
@@ -291,22 +293,22 @@ func (f *FreeIPA) CreateUser(ctx context.Context, reqUser RequestUser) (int, *Us
 		return 0, nil, fmt.Errorf(errMsgFailedToHTTPRequest+": %s", err)
 	}
 
-	resp, err := f.handleResponse(statusCode, bodyBytes)
+	newStatusCode, resp, err := f.handleResponse(statusCode, bodyBytes)
 	if err != nil {
-		return statusCode, nil, err
+		return newStatusCode, nil, err
 	}
 	if resp.Result == nil {
-		return statusCode, nil, errors.New(errMsgResponseResultIsNil)
+		return 0, nil, errors.New(errMsgResponseResultIsNil)
 	}
 
 	userTmp, ok := resp.Result.Result.(map[string]any)
 	if !ok {
-		return statusCode, nil, errors.New(errMsgFailedToParseResponse)
+		return 0, nil, errors.New(errMsgFailedToParseResponse)
 	}
 
 	user := mapUserToDTOUser(userTmp)
 
-	return statusCode, &user, nil
+	return newStatusCode, &user, nil
 }
 
 // UpdateUser тут лучше пользователя обратно не отдавать, т.к. он имеет не полные данные
@@ -347,11 +349,12 @@ func (f *FreeIPA) UpdateUser(ctx context.Context, reqUser RequestUser) (int, err
 		return 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %s", err)
 	}
 
-	if _, err = f.handleResponse(statusCode, bodyBytes); err != nil {
-		return statusCode, err
+	newStatusCode, _, err := f.handleResponse(statusCode, bodyBytes)
+	if err != nil {
+		return newStatusCode, err
 	}
 
-	return statusCode, nil
+	return newStatusCode, nil
 }
 
 func (f *FreeIPA) DeleteUser(ctx context.Context, userID string) (int, error) {
@@ -371,11 +374,12 @@ func (f *FreeIPA) DeleteUser(ctx context.Context, userID string) (int, error) {
 		return 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %s", err)
 	}
 
-	if _, err = f.handleResponse(statusCode, bodyBytes); err != nil {
-		return statusCode, err
+	newStatusCode, _, err := f.handleResponse(statusCode, bodyBytes)
+	if err != nil {
+		return newStatusCode, err
 	}
 
-	return statusCode, nil
+	return newStatusCode, nil
 }
 
 // roles
@@ -427,22 +431,22 @@ func (f *FreeIPA) GetRole(ctx context.Context, name string) (int, *Role, error) 
 		return 0, nil, fmt.Errorf(errMsgFailedToHTTPRequest+": %s", err)
 	}
 
-	resp, err := f.handleResponse(statusCode, bodyBytes)
+	newStatusCode, resp, err := f.handleResponse(statusCode, bodyBytes)
 	if err != nil {
-		return statusCode, nil, err
+		return newStatusCode, nil, err
 	}
 	if resp.Result == nil {
-		return statusCode, nil, errors.New(errMsgResponseResultIsNil)
+		return 0, nil, errors.New(errMsgResponseResultIsNil)
 	}
 
 	roleTmp, ok := resp.Result.Result.(map[string]any)
 	if !ok {
-		return statusCode, nil, errors.New(errMsgFailedToParseResponse)
+		return 0, nil, errors.New(errMsgFailedToParseResponse)
 	}
 
 	role := mapUserToDTORole(roleTmp)
 
-	return statusCode, &role, nil
+	return newStatusCode, &role, nil
 }
 
 func (f *FreeIPA) HasRole(ctx context.Context, name string) (int, bool, error) {
@@ -478,11 +482,12 @@ func (f *FreeIPA) CreateRole(ctx context.Context, name string, desc *string) (in
 		return 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %s", err)
 	}
 
-	if _, err = f.handleResponse(statusCode, bodyBytes); err != nil {
-		return statusCode, err
+	newStatusCode, _, err := f.handleResponse(statusCode, bodyBytes)
+	if err != nil {
+		return newStatusCode, err
 	}
 
-	return statusCode, nil
+	return newStatusCode, nil
 }
 
 func (f *FreeIPA) UpdateRole(ctx context.Context, name, desc string) (int, error) {
@@ -505,11 +510,12 @@ func (f *FreeIPA) UpdateRole(ctx context.Context, name, desc string) (int, error
 		return 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %s", err)
 	}
 
-	if _, err = f.handleResponse(statusCode, bodyBytes); err != nil {
-		return statusCode, err
+	newStatusCode, _, err := f.handleResponse(statusCode, bodyBytes)
+	if err != nil {
+		return newStatusCode, err
 	}
 
-	return statusCode, nil
+	return newStatusCode, nil
 }
 
 func (f *FreeIPA) DeleteRole(ctx context.Context, name string) (int, error) {
@@ -529,11 +535,12 @@ func (f *FreeIPA) DeleteRole(ctx context.Context, name string) (int, error) {
 		return 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %s", err)
 	}
 
-	if _, err = f.handleResponse(statusCode, bodyBytes); err != nil {
-		return statusCode, err
+	newStatusCode, _, err := f.handleResponse(statusCode, bodyBytes)
+	if err != nil {
+		return newStatusCode, err
 	}
 
-	return statusCode, nil
+	return newStatusCode, nil
 }
 
 func (f *FreeIPA) ToggleRoleForUser(ctx context.Context, roleName, userID string) (int, error) {
@@ -571,11 +578,12 @@ func (f *FreeIPA) editRoleForUser(ctx context.Context, roleName, userID string, 
 		return 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %s", err)
 	}
 
-	if _, err = f.handleResponse(statusCode, bodyBytes); err != nil {
-		return statusCode, err
+	newStatusCode, _, err := f.handleResponse(statusCode, bodyBytes)
+	if err != nil {
+		return newStatusCode, err
 	}
 
-	return statusCode, nil
+	return newStatusCode, nil
 }
 
 func (f *FreeIPA) getAllRoles(ctx context.Context) (int, []Role, uint32, error) {
@@ -598,17 +606,17 @@ func (f *FreeIPA) getAllRoles(ctx context.Context) (int, []Role, uint32, error) 
 		return 0, nil, 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %s", err)
 	}
 
-	resp, err := f.handleResponse(statusCode, bodyBytes)
+	newStatusCode, resp, err := f.handleResponse(statusCode, bodyBytes)
 	if err != nil {
-		return statusCode, nil, 0, err
+		return newStatusCode, nil, 0, err
 	}
 	if resp.Result == nil {
-		return statusCode, nil, 0, errors.New(errMsgResponseResultIsNil)
+		return 0, nil, 0, errors.New(errMsgResponseResultIsNil)
 	}
 
 	rolesTmp, ok := resp.Result.Result.([]any)
 	if !ok {
-		return statusCode, nil, 0, errors.New("failed to parse roles response")
+		return 0, nil, 0, errors.New("failed to parse roles response")
 	}
 
 	roles := make([]Role, 0, len(rolesTmp))
@@ -617,13 +625,13 @@ func (f *FreeIPA) getAllRoles(ctx context.Context) (int, []Role, uint32, error) 
 	for _, v := range rolesTmp {
 		v2, ok := v.(map[string]any)
 		if !ok {
-			return statusCode, nil, 0, errors.New("failed to parse role response")
+			return 0, nil, 0, errors.New("failed to parse role response")
 		}
 
 		roles = append(roles, mapUserToDTORole(v2))
 	}
 
-	return statusCode, roles, total, nil
+	return newStatusCode, roles, total, nil
 }
 
 func (f *FreeIPA) getAllRolesByName(ctx context.Context, names []string) (int, []Role, error) {
@@ -657,12 +665,12 @@ func (f *FreeIPA) getAllRolesByName(ctx context.Context, names []string) (int, [
 		return 0, nil, fmt.Errorf(errMsgFailedToHTTPRequest+": %s", err)
 	}
 
-	resp, err := f.handleResponse(statusCode, bodyBytes)
+	newStatusCode, resp, err := f.handleResponse(statusCode, bodyBytes)
 	if err != nil {
-		return statusCode, nil, err
+		return newStatusCode, nil, err
 	}
 	if resp.Result == nil {
-		return statusCode, nil, errors.New(errMsgResponseResultIsNil)
+		return 0, nil, errors.New(errMsgResponseResultIsNil)
 	}
 
 	var errs []error
@@ -672,7 +680,7 @@ func (f *FreeIPA) getAllRolesByName(ctx context.Context, names []string) (int, [
 		}
 	}
 	if len(errs) > 0 {
-		return statusCode, nil, errors.Join(errs...)
+		return 0, nil, errors.Join(errs...)
 	}
 
 	roles := make([]Role, 0, len(resp.Result.Results))
@@ -683,7 +691,7 @@ func (f *FreeIPA) getAllRolesByName(ctx context.Context, names []string) (int, [
 		}
 	}
 
-	return statusCode, roles, nil
+	return newStatusCode, roles, nil
 }
 
 func (f *FreeIPA) headers() map[string]string {
@@ -738,15 +746,19 @@ func (f *FreeIPA) httpRequest(
 }
 
 func (f *FreeIPA) handleResponse( //nolint:nonamedreturns
-	statusCode int,
+	statusCodeSrc int,
 	bodyBytes []byte,
-) (resp responseBasic, err error) {
+) (statusCode int, resp responseBasic, err error) {
 	// Тут может быть ситуация когда код 200, но есть и ошибка (в json),
-	// например (no modifications to be performed, нет данных для изменений).
-	// Такое тогда будем игнорить явно.
+	// например (no modifications to be performed, нет данных для изменений),
+	// или пользователь пытается обновить данные админа,
+	// или пользователя нет.
+	// В такой ситуации отдаем код 0.
+
+	statusCode = statusCodeSrc
 
 	// выставим по дефолту
-	if statusCode >= http.StatusBadRequest {
+	if statusCodeSrc >= http.StatusBadRequest {
 		err = errors.New("unknown error")
 	}
 
@@ -755,13 +767,37 @@ func (f *FreeIPA) handleResponse( //nolint:nonamedreturns
 	if len(bodyBytes) > 0 {
 		// если успешно пропарсились данные, то выудим ошибку
 		if unmarshalErr := json.Unmarshal(bodyBytes, &resp); unmarshalErr == nil {
-			if resp.Error != nil && statusCode >= http.StatusBadRequest {
-				err = fmt.Errorf("response has error: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+			if resp.Error != nil {
+				err = errors.New(resp.Error.Message)
+
+				if resp.Error.Code == 4001 { // если entity not found
+					statusCode = http.StatusNotFound
+				} else if statusCodeSrc < http.StatusBadRequest {
+					statusCode = 0
+				}
 			}
 		}
 	}
 
-	return
+	//nolint:lll
+	/*
+		example:
+		{
+		  "result" : null,
+		  "error" : {
+		    "code" : 2100,
+		    "message" : "Insufficient access: Insufficient 'write' privilege to the 'sn' attribute of entry 'uid=admin,cn=users,cn=accounts,dc=nms,dc=fraxis,dc=ru'.",
+		    "data" : {
+		      "info" : "Insufficient 'write' privilege to the 'sn' attribute of entry 'uid=admin,cn=users,cn=accounts,dc=nms,dc=fraxis,dc=ru'."
+		    },
+		    "name" : "ACIError"
+		  },
+		  "id" : "e62e8f74-459a-4f00-af42-a0ddf2106cdd",
+		  "principal" : "jftxifmcnf@NMS.FRAXIS.RU",
+		  "version" : "4.12.5"
+		}
+	*/
+	return //nolint: nakedret
 }
 
 func NewFreeIPA(scheme, host string, transport *http.Transport, timeout time.Duration) *FreeIPA {
