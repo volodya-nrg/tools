@@ -41,7 +41,7 @@ func HTTPRequest(
 ) (int, []byte, error) {
 	req, err := http.NewRequestWithContext(ctx, method, u.String(), bytes.NewReader(body))
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed to create request: %w", err)
+		return 0, nil, fmt.Errorf("failed to create request: %s", err)
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded") // default
@@ -52,7 +52,7 @@ func HTTPRequest(
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed to execute request: %w", err)
+		return 0, nil, fmt.Errorf("failed to execute request: %s", err)
 	}
 
 	defer func() {
@@ -63,7 +63,7 @@ func HTTPRequest(
 
 	bodyBytes, err := io.ReadAll(resp.Body) // cut data (once)
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed to read response body: %w", err)
+		return 0, nil, fmt.Errorf("failed to read response body: %s", err)
 	}
 
 	return resp.StatusCode, bodyBytes, nil // отдаем данные как есть, принимающая сторона распределится ими
