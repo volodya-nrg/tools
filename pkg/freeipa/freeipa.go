@@ -740,16 +740,20 @@ func (f *FreeIPA) handleResponse( //nolint:nonamedreturns
 	statusCode int,
 	bodyBytes []byte,
 ) (resp responseBasic, err error) {
-	if statusCode >= http.StatusBadRequest {
-		err = errors.New("unknown error")
-	}
+	// Тут может быть ситуация когда код 200, но есть и ошибка (в json),
+	// например (no modifications to be performed, нет данных для изменений).
+	// Такое тогда будет игнорить явно.
 
-	// если есть какие-то (html, json или др.) байты, то обработаем их
-	if len(bodyBytes) > 0 {
-		// если успешно пропарсились данные, то выудим ошибку
-		if unmarshalErr := json.Unmarshal(bodyBytes, &resp); unmarshalErr == nil {
-			if resp.Error != nil {
-				err = fmt.Errorf("response has error: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+	if statusCode >= http.StatusBadRequest {
+		err = errors.New("unknown error") // ошибка по умолчанию
+
+		// если есть какие-то (html, json или др.) байты, то обработаем их
+		if len(bodyBytes) > 0 {
+			// если успешно пропарсились данные, то выудим ошибку
+			if unmarshalErr := json.Unmarshal(bodyBytes, &resp); unmarshalErr == nil {
+				if resp.Error != nil {
+					err = fmt.Errorf("response has error: code (%d), msg (%s)", resp.Error.Code, resp.Error.Message)
+				}
 			}
 		}
 	}
