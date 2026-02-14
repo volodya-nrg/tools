@@ -749,11 +749,11 @@ func (f *FreeIPA) handleResponse( //nolint:nonamedreturns
 	statusCodeSrc int,
 	bodyBytes []byte,
 ) (statusCode int, resp responseBasic, err error) {
-	// Тут может быть ситуация когда код 200, но есть и ошибка (в json),
-	// например (no modifications to be performed, нет данных для изменений),
-	// или пользователь пытается обновить данные админа,
-	// или пользователя нет.
-	// В такой ситуации отдаем код 0.
+	// Надо взять за правило: если есть ошибка в json, то ответ является ошибочным.
+	// Может быть ситуация когда код 200, но есть и ошибка (в json), например:
+	// - no modifications to be performed (нет данных для изменений)
+	// - или пользователь пытается обновить данные админа
+	// - или пользователя нет
 
 	statusCode = statusCodeSrc
 
@@ -768,11 +768,19 @@ func (f *FreeIPA) handleResponse( //nolint:nonamedreturns
 		// если успешно пропарсились данные, то выудим ошибку
 		if unmarshalErr := json.Unmarshal(bodyBytes, &resp); unmarshalErr == nil {
 			if resp.Error != nil {
-				err = fmt.Errorf("original http-statusCode %d, json-errorCode %d: %s", statusCode, resp.Error.Code, resp.Error.Message)
+				err = fmt.Errorf(
+					"original http-statusCode %d, json-errorCode %d: %s",
+					statusCode,
+					resp.Error.Code,
+					resp.Error.Message,
+				)
 
-				if resp.Error.Code == 4001 { // если entity not found
+				switch resp.Error.Code {
+				case 4001: // если entity not found
 					statusCode = http.StatusNotFound
-				} else if statusCodeSrc < http.StatusBadRequest {
+				case 4202: // no modifications to be performed (нет данных для изменений)
+					statusCode = http.StatusBadRequest // поменяем явно, ни чего страшного
+				default:
 					statusCode = 0
 				}
 			}
