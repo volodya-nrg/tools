@@ -759,7 +759,7 @@ func (f *FreeIPA) handleResponse( //nolint:nonamedreturns
 
 	// выставим по дефолту
 	if statusCodeSrc >= http.StatusBadRequest {
-		err = errors.New("unknown error")
+		err = fmt.Errorf("original http-statusCode %d: unknown error", statusCode)
 	}
 
 	// Если есть какие-то (html, json или др.) байты, то обработаем их.
@@ -768,7 +768,7 @@ func (f *FreeIPA) handleResponse( //nolint:nonamedreturns
 		// если успешно пропарсились данные, то выудим ошибку
 		if unmarshalErr := json.Unmarshal(bodyBytes, &resp); unmarshalErr == nil {
 			if resp.Error != nil {
-				err = errors.New(resp.Error.Message)
+				err = fmt.Errorf("original http-statusCode %d, json-errorCode %d: %s", statusCode, resp.Error.Code, resp.Error.Message)
 
 				if resp.Error.Code == 4001 { // если entity not found
 					statusCode = http.StatusNotFound
