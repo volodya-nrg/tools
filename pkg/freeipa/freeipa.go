@@ -759,7 +759,7 @@ func (f *FreeIPA) handleResponse( //nolint:nonamedreturns
 
 	// выставим по дефолту
 	if statusCodeSrc >= http.StatusBadRequest {
-		err = fmt.Errorf("original http-statusCode %d: unknown error", statusCode)
+		err = fmt.Errorf("original http-statusCode %d", statusCode)
 	}
 
 	// Если есть какие-то (html, json или др.) байты, то обработаем их.
