@@ -779,7 +779,10 @@ func (f *FreeIPA) handleResponse( //nolint:nonamedreturns
 				case 4001: // если entity not found
 					statusCode = http.StatusNotFound
 				case 4202: // no modifications to be performed (нет данных для изменений)
-					statusCode = http.StatusBadRequest // поменяем явно, ни чего страшного
+					// При конвертации http.StatusCode в grpc.Code, StatusBadRequest = Internal,
+					// поэтому смысла нет тут особо менять. Лучше отдать такой же статус как есть, т.е. 200,
+					// а ошибку замьютить.
+					err = nil
 				default:
 					statusCode = 0
 				}
