@@ -775,6 +775,7 @@ func (f *FreeIPA) handleResponse( //nolint:nonamedreturns
 					resp.Error.Message,
 				)
 
+				//nolint: mnd
 				switch resp.Error.Code {
 				case 4001: // если entity not found
 					statusCode = http.StatusNotFound
