@@ -9,6 +9,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,6 +46,8 @@ const (
 	keyOptJPEGPhoto             = "jpegphoto"
 	keyOptObjectClass           = "objectclass"
 	keyOptMemberUser            = "member_user"
+	keyKRBMaxPWDLife            = "krbmaxpwdlife"
+	defaultKRBMaxPWDLife        = 90 // в днях
 )
 
 // FreeIPA клиент для общения с сервером IPA. Ошибки все таки надо различать: внутренние и ошибки от response-а.
@@ -550,6 +553,55 @@ func (f *FreeIPA) ToggleRoleForUser(ctx context.Context, roleName, userID string
 	}
 
 	return f.editRoleForUser(ctx, roleName, userID, slices.Contains(user.MemberOfRole, roleName))
+}
+
+func (f *FreeIPA) GetKrbMaxPWDLife(ctx context.Context) (int, int, error) {
+	u := url.URL{
+		Scheme: f.scheme,
+		Host:   f.host,
+		Path:   "ipa/session/json",
+	}
+	opts := map[string]any{
+		// "all": true,
+	}
+
+	req, err := f.rpcReq("pwpolicy_show", "", opts, true)
+	if err != nil {
+		return 0, 0, fmt.Errorf(errMsgFailedToCreateJSONRPCRequest+": %s", err)
+	}
+
+	statusCode, bodyBytes, err := f.httpRequest(ctx, f.client, http.MethodPost, u, req, f.headers())
+	if err != nil {
+		return 0, 0, fmt.Errorf(errMsgFailedToHTTPRequest+": %s", err)
+	}
+
+	newStatusCode, resp, err := f.handleResponse(statusCode, bodyBytes)
+	if err != nil {
+		return newStatusCode, 0, err
+	}
+	if resp.Result == nil {
+		return 0, 0, errors.New(errMsgResponseResultIsNil)
+	}
+
+	respPWPolicy, ok := resp.Result.Result.(map[string]any)
+	if !ok {
+		return 0, 0, errors.New(errMsgFailedToParseResponse)
+	}
+
+	krbMaxPWDLife := defaultKRBMaxPWDLife
+
+	for k1, v1 := range respPWPolicy {
+		if k1 == keyKRBMaxPWDLife && isNotEmptySlice(v1) {
+			if v2, ok := v1.([]any); ok {
+				strSlice := convertSliceAnyToSliceStr(v2)
+				if krbMaxPWDLife, err = strconv.Atoi(strSlice[0]); err != nil {
+					return 0, 0, errors.New("failed to parse krbMaxPWDLife")
+				}
+			}
+		}
+	}
+
+	return newStatusCode, krbMaxPWDLife, nil
 }
 
 func (f *FreeIPA) editRoleForUser(ctx context.Context, roleName, userID string, isRemove bool) (int, error) {

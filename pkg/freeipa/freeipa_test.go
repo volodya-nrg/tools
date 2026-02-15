@@ -41,6 +41,12 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, statusCode)
 
+		// считаем сразу максимальный строк действия пароля
+		statusCode, pwdMaxLife, err := cl.GetKrbMaxPWDLife(t.Context())
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
+		require.Positive(t, pwdMaxLife)
+
 		newUserID := funcs.RandStr()
 
 		// создадим пользователя
