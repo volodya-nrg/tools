@@ -41,12 +41,6 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, statusCode)
 
-		// считаем сразу максимальный строк действия пароля
-		statusCode, pwdMaxLife, err := cl.GetKrbMaxPWDLife(t.Context())
-		require.NoError(t, err)
-		require.Equal(t, http.StatusOK, statusCode)
-		require.Positive(t, pwdMaxLife)
-
 		newUserID := funcs.RandStr()
 
 		// создадим пользователя
@@ -87,7 +81,7 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, statusCode)
 
-		// проверим еще раз
+		// проверим еще раз выход
 		statusCode, err = cl.Logout(t.Context())
 		require.Error(t, err)
 		require.Equal(t, http.StatusUnauthorized, statusCode)
@@ -192,10 +186,12 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.Equal(t, http.StatusOK, statusCode)
 		require.NotContains(t, userActual.MemberOfRole, roleName)
 
-		// удалим роль и пользователя
+		// удалим роль
 		statusCode, err = cl.DeleteRole(t.Context(), roleName)
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, statusCode)
+
+		// удалим пользователя
 		statusCode, err = cl.DeleteUser(t.Context(), newUserID)
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, statusCode)
@@ -311,6 +307,70 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.False(t, isHas)
 
 		// выйдем из под админа
+		statusCode, err = cl.Logout(t.Context())
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
+	})
+	t.Run("check pwd policy", func(t *testing.T) {
+		// считаем максимальный строк действия пароля из под гостя
+		statusCode, pwdMaxLife, err := cl.GetKrbMaxPWDLife(t.Context())
+		require.Error(t, err)
+		require.Equal(t, http.StatusUnauthorized, statusCode)
+		require.Zero(t, pwdMaxLife)
+
+		statusCode, err = cl.Login(t.Context(), adminLogin, adminPass)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
+
+		// считаем максимальный строк действия пароля
+		statusCode, pwdMaxLife, err = cl.GetKrbMaxPWDLife(t.Context())
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
+		require.Positive(t, pwdMaxLife)
+
+		// создадим пользователя
+		newUserID := funcs.RandStr()
+		reqUser := RequestUser{
+			UID:                   newUserID,
+			GivenName:             newUserID + "-firstname",
+			SN:                    newUserID + "-lastname",
+			UserPassword:          funcs.Pointer(password1),
+			KRBPasswordExpiration: funcs.Pointer(time.Now().AddDate(0, 3, 0)),
+		}
+		statusCode, _, err = cl.CreateUser(t.Context(), reqUser)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
+
+		// выйдем из под админа
+		statusCode, err = cl.Logout(t.Context())
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
+
+		// зайдем под новым пользователем
+		statusCode, err = cl.Login(t.Context(), newUserID, password1)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
+
+		// считаем максимальный строк действия пароля из пользователя
+		statusCode, pwdMaxLife, err = cl.GetKrbMaxPWDLife(t.Context())
+		require.Error(t, err)
+		require.Equal(t, http.StatusNotFound, statusCode) // password policy not found
+		require.Zero(t, pwdMaxLife)
+
+		statusCode, err = cl.Logout(t.Context())
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
+
+		// зайдем под админом, удалим пользователя и выйдем
+		statusCode, err = cl.Login(t.Context(), adminLogin, adminPass)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
+
+		// удалим пользователя
+		statusCode, err = cl.DeleteUser(t.Context(), newUserID)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, statusCode)
+
 		statusCode, err = cl.Logout(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, statusCode)
