@@ -311,7 +311,7 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, statusCode)
 	})
-	t.Run("check pwd policy", func(t *testing.T) {
+	t.Run("check pwd policy", func(t *testing.T) { //nolint:paralleltest
 		// считаем максимальный строк действия пароля из под гостя
 		statusCode, pwdMaxLife, err := cl.GetKrbMaxPWDLife(t.Context())
 		require.Error(t, err)

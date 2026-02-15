@@ -46,8 +46,8 @@ const (
 	keyOptJPEGPhoto             = "jpegphoto"
 	keyOptObjectClass           = "objectclass"
 	keyOptMemberUser            = "member_user"
-	keyKRBMaxPWDLife            = "krbmaxpwdlife"
-	defaultKRBMaxPWDLife        = 90 // в днях
+	keyKRBMaxPWDLife            = "krbmaxpwdlife" //nolint:gosec
+	defaultKRBMaxPWDLife        = 90              // в днях
 )
 
 // FreeIPA клиент для общения с сервером IPA. Ошибки все таки надо различать: внутренние и ошибки от response-а.
