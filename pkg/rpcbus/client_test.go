@@ -21,7 +21,7 @@ func TestRPCBus(t *testing.T) {
 	// если id - это request
 	// если id нет - это notif
 
-	rpcBusClient, err := NewClient("10.12.0.14:8080")
+	rpcBusClient, err := NewClient("10.10.10.159:15555")
 	require.NoError(t, err)
 
 	t.Cleanup(func() {

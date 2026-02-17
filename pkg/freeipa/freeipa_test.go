@@ -41,7 +41,7 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, statusCode)
 
-		newUserID := funcs.RandStr()
+		newUserID := "test-" + funcs.RandStr()
 
 		// создадим пользователя
 		reqUser := RequestUser{
@@ -211,7 +211,7 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, statusCode)
 
-		roleName := funcs.RandStr()
+		roleName := "test-" + funcs.RandStr()
 		roleDesc := funcs.RandStr()
 
 		// создадим роль
@@ -329,7 +329,7 @@ func TestFreeIPA(t *testing.T) { //nolint:tparallel
 		require.Positive(t, pwdMaxLife)
 
 		// создадим пользователя
-		newUserID := funcs.RandStr()
+		newUserID := "test-" + funcs.RandStr()
 		reqUser := RequestUser{
 			UID:                   newUserID,
 			GivenName:             newUserID + "-firstname",

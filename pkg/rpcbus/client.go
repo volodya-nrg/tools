@@ -10,10 +10,12 @@ import (
 	"log/slog"
 	"net"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const (
-	defaultDelim = "\n" // "⛔"
+	defaultDelim = "⛔" // "⛔", "\n"
 	readTimeout  = 10 * time.Second
 	timeout      = 3 * time.Second
 	keepAlive    = 30 * time.Second
@@ -38,7 +40,7 @@ func (c *Client) Call(ctx context.Context, method string, params any) ([]byte, e
 		JsonRpc: "2.0",
 		Method:  method,
 		// Params:  fmt.Sprintf(`{"client_id": "%s"}`, uuid.NewString()),
-		ID: time.Now().Format(time.RFC3339Nano),
+		ID: uuid.NewString(), // time.Now().Format(time.RFC3339Nano),
 	}
 
 	if params != nil {

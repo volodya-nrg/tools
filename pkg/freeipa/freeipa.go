@@ -129,6 +129,7 @@ func (f *FreeIPA) GetUsers(ctx context.Context, limit, offset int32) (int, []Use
 		"pkey_only": true,
 	}
 
+	// список пользователей отдается в алфавитном порядке по uid
 	req, err := f.rpcReq("user_find", "", opts, true)
 	if err != nil {
 		return 0, nil, 0, fmt.Errorf(errMsgFailedToCreateJSONRPCRequest+" (user_find): %s", err)
